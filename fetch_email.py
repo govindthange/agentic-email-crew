@@ -3,6 +3,7 @@ import json
 import logging
 import msal
 import requests
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -38,6 +39,41 @@ def get_access_token():
         raise Exception(f"Failed to get token: {result.get('error_description')}")
     return result["access_token"]
 
+def archive_email(email_data):
+    """Appends email metadata to a daily JSON archive file."""
+    data_dir = "./data"
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    today = datetime.now().strftime("%Y%m%d")
+    archive_file = os.path.join(data_dir, f"archive-{today}.json")
+
+    # Load existing data or initialize with empty list
+    archive_data = []
+    if os.path.exists(archive_file):
+        try:
+            with open(archive_file, "r") as f:
+                archive_data = json.load(f)
+                if not isinstance(archive_data, list):
+                    archive_data = []
+        except (json.JSONDecodeError, IOError):
+            logging.warning(f"Failed to read {archive_file}, starting fresh.")
+            archive_data = []
+
+    # Check for duplicate messageId
+    if any(item.get("messageId") == email_data.get("messageId") for item in archive_data):
+        logging.info(f"Email with messageId {email_data.get('messageId')} already exists in archive. Skipping.")
+        return
+
+    # Append new email data
+    archive_data.append(email_data)
+
+    # Save back to file
+    with open(archive_file, "w") as f:
+        json.dump(archive_data, f, indent=4)
+    
+    logging.info(f"Email archived to {archive_file}")
+
 def fetch_last_email():
     try:
         logging.info("Acquiring OAuth token...")
@@ -45,7 +81,6 @@ def fetch_last_email():
         headers = {"Authorization": f"Bearer {token}"}
 
         logging.info(f"Fetching last email for {EMAIL}...")
-        # Use /users/{email}/messages for app-only (client credentials) flow
         url = (
             f"{GRAPH_BASE}/users/{EMAIL}/mailFolders/inbox/messages"
             f"?$top=1&$orderby=receivedDateTime desc"
@@ -76,7 +111,7 @@ def fetch_last_email():
         }
 
         logging.info("Successfully fetched last email.")
-        logging.info("JSON metadata = " + json.dumps(email_data, indent=4))
+        archive_email(email_data)
 
     except requests.HTTPError as e:
         logging.error(f"HTTP error: {e.response.status_code} - {e.response.text}")

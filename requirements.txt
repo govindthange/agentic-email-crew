@@ -1,4 +1,3 @@
 python-dotenv
-exchangelib
-requests
 msal
+requests
