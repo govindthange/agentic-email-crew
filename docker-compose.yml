@@ -4,7 +4,7 @@ services:
   email-fetcher:
     build: .
     volumes:
-      - ./app.log:/app/app.log
+      - ./logs:/app/logs
       - ./data:/app/data
     env_file:
       - .env

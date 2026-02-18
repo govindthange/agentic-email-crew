@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY fetch_email.py .
 
 # Create necessary files/directories
-RUN touch app.log && mkdir -p data
+RUN mkdir -p data logs
 
 # Run the script
 CMD ["python", "fetch_email.py"]

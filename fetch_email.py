@@ -13,11 +13,18 @@ CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 TENANT_ID = os.getenv("TENANT_ID")
 EMAIL = os.getenv("EMAIL")  # The mailbox to read from
 
+# Setup daily logging
+today_str = datetime.now().strftime("%Y%m%d")
+log_dir = "./logs"
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+log_file = os.path.join(log_dir, f"app-{today_str}.log")
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("app.log"),
+        logging.FileHandler(log_file),
         logging.StreamHandler()
     ]
 )
