@@ -1,10 +1,12 @@
 version: '3.8'
 
 services:
-  email-fetcher:
-    build: .
+  email-reader-console:
+    build:
+      context: ./email-reader-console
+      dockerfile: Dockerfile
     volumes:
-      - ./logs:/app/logs
-      - ./data:/app/data
+      - ./email-reader-console/logs:/app/logs
+      - ./email-reader-console/data:/app/data
     env_file:
-      - .env
+      - ./email-reader-console/.env
