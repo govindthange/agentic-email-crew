@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  email-fetcher:
+    build: .
+    volumes:
+      - ./app.log:/app/app.log
+    env_file:
+      - .env

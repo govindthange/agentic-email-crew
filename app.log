@@ -1,0 +1,34 @@
+2026-02-18 11:59:27,332 - INFO - Acquiring OAuth token...
+2026-02-18 11:59:27,793 - INFO - Fetching last email for govindt@winsoftech.com...
+2026-02-18 11:59:28,042 - INFO - Successfully fetched last email.
+2026-02-18 11:59:28,043 - INFO - 
+JSON metadata = {
+    "from": "pm_policy@cityunionbank.in",
+    "to": [
+        "sundaresan.a@cityunionbank.in",
+        "vibhudendra_15735@cityunionbank.in"
+    ],
+    "cc": [
+        "microcredit@cityunionbank.in",
+        "sundararaman@cityunionbank.in",
+        "devanandn@winsoftech.com",
+        "akshatah@winsoftech.com",
+        "jegannathan.r@cityunionbank.in",
+        "ramachandran.h@cityunionbank.in",
+        "apyteam@winsoftech.com",
+        "neelasrikandan.vr@cityunionbank.in",
+        "senthilkumar.s@cityunionbank.in",
+        "sivakumar.v@cityunionbank.in",
+        "srivatsan.seshadri@cityunionbank.in",
+        "manibalan.m@cityunionbank.in"
+    ],
+    "subject": "Re: Observation In APY UAT Link",
+    "receivedOn": "2026-02-18T11:53:52Z",
+    "category": [
+        "^CUB",
+        "apy"
+    ],
+    "messageId": "<894849359.28615879.1771415597231.JavaMail.zimbra@cityunionbank.in>",
+    "priority": "normal",
+    "contentType": "HTML"
+}
