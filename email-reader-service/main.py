@@ -124,7 +124,8 @@ def fetch_last_email():
             "category": msg.get("categories") or "N/A",
             "messageId": msg.get("internetMessageId"),
             "priority": msg.get("importance"),
-            "contentType": "HTML" if "<html>" in body_content.lower() else "Text"
+            "contentType": "HTML" if "<html>" in body_content.lower() else "Text",
+            "body": body_content
         }
 
         archived = archive_email(email_data)

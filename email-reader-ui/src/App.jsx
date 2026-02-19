@@ -75,6 +75,11 @@ function App({ backendOrigin }) {
           <p>Status: {lastEmail.status}</p>
           <p>Archived: {lastEmail.archived ? 'Yes' : 'No'}</p>
           <pre>{JSON.stringify(lastEmail.email, null, 2)}</pre>
+          <h4>Last Email Content:</h4>
+          <div
+            className="email-body-content"
+            dangerouslySetInnerHTML={{ __html: lastEmail.email.body }}
+          />
         </div>
       )}
 
