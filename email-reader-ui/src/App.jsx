@@ -56,7 +56,7 @@ function App({ backendOrigin }) {
 
   return (
     <div className="email-reader-ui">
-      <h1>Email Reader UI</h1>
+      <h1>Inbox Queries</h1>
 
       <div className="actions">
         <button onClick={fetchLastEmail} disabled={loading}>Fetch Last Email</button>

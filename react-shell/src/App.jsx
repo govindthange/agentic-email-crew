@@ -22,8 +22,8 @@ function App() {
   return (
     <div className="react-shell">
       <header className="shell-header">
-        <h1>Microfrontend Shell</h1>
-        <p>Federating and orchestrating microservices UIs</p>
+        <h1>The Email Crew</h1>
+        <p>Federating microservices & Orchestrating AI Agents</p>
       </header>
 
       <main className="shell-content">
@@ -38,14 +38,14 @@ function App() {
         {/* Placeholder for future MFEs */}
         <section className="mfe-placeholder">
           <div className="placeholder-card">
-            <h3>Future Service</h3>
-            <p>This space is reserved for the next microfrontend.</p>
+            <h3>Future Services</h3>
+            <p>This space is reserved for other features.</p>
           </div>
         </section>
       </main>
 
       <footer className="shell-footer">
-        <p>&copy; 2026 The Email Crew - Microservices Architecture</p>
+        <p>&copy; 2026 The Email Crew - An Agentic AI System</p>
       </footer>
     </div>
   )
