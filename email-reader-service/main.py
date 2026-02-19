@@ -139,9 +139,74 @@ def fetch_last_email():
         logging.error(f"Error fetching email: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/email/fetch/all")
-def fetch_all_emails():
-    return {"status": "Work In Progress"}
+from typing import Optional
+
+@app.get("/api/emails")
+def fetch_emails_by_range(start_date: Optional[str] = None, end_date: Optional[str] = None):
+    try:
+        logging.info(f"Acquiring OAuth token for fetch emails range ({start_date} to {end_date})...")
+        token = get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Default start_date to today if not provided
+        if not start_date:
+            start_date = datetime.now().strftime("%Y-%m-%d")
+        
+        filter_query = f"receivedDateTime ge {start_date}T00:00:00Z"
+        
+        if end_date:
+            filter_query += f" and receivedDateTime le {end_date}T23:59:59Z"
+        
+        url = (
+            f"{GRAPH_BASE}/users/{EMAIL}/mailFolders/inbox/messages"
+            f"?$filter={filter_query}"
+            f"&$select=from,toRecipients,ccRecipients,subject,"
+            f"receivedDateTime,categories,internetMessageId,importance,body"
+            f"&$orderby=receivedDateTime desc"
+        )
+
+        total_fetched = 0
+        newly_archived = 0
+
+        while url:
+            logging.info(f"Fetching page of emails from: {url}")
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            
+            messages = data.get("value", [])
+            total_fetched += len(messages)
+
+            for msg in messages:
+                body_content = msg.get("body", {}).get("content", "")
+                email_data = {
+                    "from": msg.get("from", {}).get("emailAddress", {}).get("address"),
+                    "to": [r["emailAddress"]["address"] for r in msg.get("toRecipients", [])],
+                    "cc": [r["emailAddress"]["address"] for r in msg.get("ccRecipients", [])],
+                    "subject": msg.get("subject"),
+                    "receivedOn": msg.get("receivedDateTime"),
+                    "category": msg.get("categories") or "N/A",
+                    "messageId": msg.get("internetMessageId"),
+                    "priority": msg.get("importance"),
+                    "contentType": "HTML" if "<html>" in body_content.lower() else "Text",
+                    "body": body_content
+                }
+                
+                if archive_email(email_data):
+                    newly_archived += 1
+
+            url = data.get("@odata.nextLink")
+
+        return {
+            "status": "success",
+            "total_fetched": total_fetched,
+            "newly_archived": newly_archived,
+            "message": f"Processed {total_fetched} emails, {newly_archived} were new."
+        }
+
+    except Exception as e:
+        logging.error(f"Error fetching all emails: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/email/read-count")
 def read_count():

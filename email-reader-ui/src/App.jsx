@@ -61,7 +61,15 @@ function App({ backendOrigin }) {
       <div className="actions">
         <button onClick={fetchLastEmail} disabled={loading}>Fetch Last Email</button>
         <button onClick={fetchArchiveCount} disabled={loading}>Get Today's Email Archive Count</button>
-        <button onClick={() => callWipEndpoint('/api/email/fetch/all')} disabled={loading}>Fetch All Emails</button>
+        <button
+          onClick={() => {
+            const today = new Date().toISOString().split('T')[0];
+            callWipEndpoint(`/api/emails?start_date=${today}`);
+          }}
+          disabled={loading}
+        >
+          Fetch Today's Emails
+        </button>
         <button onClick={() => callWipEndpoint('/api/email/read-count')} disabled={loading}>Read Count</button>
         <button onClick={() => callWipEndpoint('/api/email/unread-count')} disabled={loading}>Unread Count</button>
       </div>
