@@ -4,6 +4,7 @@ This workspace follows a microservices-style architecture for email automation a
 
 ## Project Structure
 
+- **[email-reader-ui/](./email-reader-ui/README.md)**: A React-based microfrontend for interacting with the email service.
 - **[email-reader-service/](./email-reader-service/README.md)**: A FastAPI microservice for fetching and archiving emails via REST API.
 - **[email-reader-console/](./email-reader-console/README.md)**: The original console-based email fetcher script.
 

@@ -21,3 +21,12 @@ services:
       - ./email-reader-service/data:/app/data
     env_file:
       - ./email-reader-service/.env
+
+  email-reader-ui:
+    build:
+      context: ./email-reader-ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - email-reader-service
