@@ -10,3 +10,14 @@ services:
       - ./email-reader-console/data:/app/data
     env_file:
       - ./email-reader-console/.env
+  email-reader-service:
+    build:
+      context: ./email-reader-service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./email-reader-service/logs:/app/logs
+      - ./email-reader-service/data:/app/data
+    env_file:
+      - ./email-reader-service/.env
