@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './App.css'
 
 function App({ backendOrigin }) {
+  console.log('EmailReaderUI: App component rendering with origin:', backendOrigin);
   const [lastEmail, setLastEmail] = useState(null)
   const [archiveCount, setArchiveCount] = useState(null)
   const [loading, setLoading] = useState(false)

@@ -30,3 +30,13 @@ services:
       - "3000:80"
     depends_on:
       - email-reader-service
+
+  react-shell:
+    build:
+      context: ./react-shell
+      dockerfile: Dockerfile
+    ports:
+      - "4000:80"
+    depends_on:
+      - email-reader-ui
+      - email-reader-service

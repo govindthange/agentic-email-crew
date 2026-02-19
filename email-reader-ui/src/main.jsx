@@ -10,7 +10,9 @@ class EmailReaderUIRoot extends HTMLElement {
   }
 
   connectedCallback() {
+    console.log('EmailReaderUIRoot: connectedCallback triggered');
     if (!this.root) {
+      console.log('EmailReaderUIRoot: Initializing React root');
       const mountPoint = document.createElement('div');
       this.attachShadow({ mode: 'open' }).appendChild(mountPoint);
 

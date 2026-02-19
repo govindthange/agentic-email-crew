@@ -1,0 +1,83 @@
+.react-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f0f2f5;
+  color: #1a1a1a;
+}
+
+.shell-header {
+  background: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%);
+  color: white;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.shell-header h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.shell-header p {
+  margin: 0.5rem 0 0;
+  opacity: 0.9;
+  font-size: 1.1rem;
+}
+
+.shell-content {
+  flex: 1;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mfe-container {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s ease;
+}
+
+.loading-placeholder {
+  padding: 5rem;
+  text-align: center;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.mfe-placeholder {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.placeholder-card {
+  background: rgba(255, 255, 255, 0.5);
+  border: 2px dashed #cbd5e0;
+  border-radius: 16px;
+  padding: 3rem;
+  text-align: center;
+  color: #718096;
+}
+
+.shell-footer {
+  padding: 2rem;
+  text-align: center;
+  background: #1a202c;
+  color: #a0aec0;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .shell-header h1 {
+    font-size: 2rem;
+  }
+}
