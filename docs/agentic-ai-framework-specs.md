@@ -1,37 +1,21 @@
-### Implementation Notes for Antigravity
-
-> *"Implement the `crewai-insight-service` as defined in the attached `agentic-ai-framework-specs.md`. Follow the **Architectural Strategy** at the beginning of the file to set up the Worker Pattern and On Demand API Pattern and ensure all Agent outputs strictly match the File Handoff Map. Specifically, ensure Agent 5 produces Markdown for humans while Agent 6 creates the interactive D3.js mindmap. Ensure the service is decoupled from the existing `email-reader-service` and is stable."*
-
 # Architectural Strategy
 
-Implement a multi-agent AI system using following strategy so as to decouple AI layer interacting with the existing `email-reader-service`. The implementation must follow both the patterns explained below, with the **Worker Pattern** being the primary one to be utilized for production stability.
+Implement the functional specifications for `Email Intelligence Multi-Agent Framework` using following architecture strategy.
 
 ### 1. The "Worker" Pattern (Service-to-Service)
 
 * **Implementation:** Create a new microservice named `crewai-insight-service`.
 * **Trigger Mechanism:** The service must support three distinct triggers:
-1. **File Watcher:** Use the `watchdog` library to monitor `./data/archives/` for new `archive-YYYYMMDD.json` files.
+1. **File Watcher:** Use the `watchdog` library in python to monitor `./data/archives/` for new `archive-YYYYMMDD.json` files.
 2. **Cron Job:** A scheduled task (configured in `service-config.yaml`) running every 4 hours to check for unprocessed archives.
 3. **On-Demand API:** A REST endpoint (`POST /process`) callable by the `email-reader-service`.
-
 
 * **Data Integration:** Map the output folder (i.e. `./data`) of the `email-reader-service` to the `./data/archives` input folder of this service.
 * **Outcome:** The service executes the CrewAI pipeline and generates the human-readable Markdown reports and interactive HTML mindmaps defined in the Handoff Map.
 
-### 2. The "On-Demand" API (Asynchronous Execution)
-
-* **Endpoint:** A `POST /api/v1/emails/summarize` endpoint handles manual triggers from the UI.
-* **Asynchronicity:** Because AI processing can take 30–90 seconds, the service must return a `job_id` immediately and process the request in the background.
-* **UI Integration:** The "Executive Dashboard" in the `email-reader-ui` will poll for the status of the `job_id` and fetch the completed reports.
-
-### 3. Mindmap Visualization Strategy
-
-* **Rendering:** Use a React-compatible visualization (such as D3.js as specified in Agent 6) to render the hierarchy.
-* **Interactivity:** The visualization must be interactive, supporting click-to-expand nodes and hover-tooltips that display the full `insight` summary (State, Next Step, Owner, and Priority).
-
 ---
 
-# Email Intelligence Multi-Agent Framework — Full Specification
+# Functional Specifications: Email Intelligence Multi-Agent Framework
 
 ---
 

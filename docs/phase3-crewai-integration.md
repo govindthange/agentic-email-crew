@@ -1,0 +1,3 @@
+> This section contains all the prompts for phase 2 of the project. LLM should not process this file.
+
+Implement the `crewai-insight-service` as defined in the `./docs/agentic-ai-framework-specs.md` file. Follow the **Architectural Strategy** at the beginning of the file to set up the Worker Pattern and On Demand API Pattern and ensure all Agent outputs strictly match the File Handoff Map. Specifically, ensure Agent 5 produces Markdown for humans while Agent 6 creates the interactive D3.js mindmap. Ensure the service is decoupled from the existing `email-reader-service` and is stable.
