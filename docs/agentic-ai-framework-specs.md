@@ -6,9 +6,9 @@ Implement the functional specifications for `Email Intelligence Multi-Agent Fram
 
 * **Implementation:** Create a new microservice named `crewai-insight-service`.
 * **Trigger Mechanism:** The service must support three distinct triggers:
-1. **File Watcher:** Use the `watchdog` library in python to monitor `./data/archives/` for new `archive-YYYYMMDD.json` files.
-2. **Cron Job:** A scheduled task (configured in `service-config.yaml`) running every 4 hours to check for unprocessed archives.
-3. **On-Demand API:** A REST endpoint (`POST /process`) callable by the `email-reader-service`.
+    1. **File Watcher:** Use the `watchdog` library in python to monitor `./data/archives/` for new `archive-YYYYMMDD.json` files.
+    2. **Cron Job:** A scheduled task (configured in `service-config.yaml`) running every 4 hours to check for unprocessed archives.
+    3. **On-Demand API:** A REST endpoint (`POST /process`) callable by the `email-reader-service`.
 
 * **Data Integration:** Map the output folder (i.e. `./data`) of the `email-reader-service` to the `./data/archives` input folder of this service.
 * **Outcome:** The service executes the CrewAI pipeline and generates the human-readable Markdown reports and interactive HTML mindmaps defined in the Handoff Map.
@@ -21,7 +21,7 @@ Implement the functional specifications for `Email Intelligence Multi-Agent Fram
 
 ## Overview
 
-This document defines a multi-agent pipeline that ingests a daily batch of 250+ emails from a structured JSON archive, deduplicates and clusters them into semantic topics, analyzes each topic for context, sentiment and urgency, and finally generates two variations of executive summaries and interactive visual mindmaps — all grouped differently for different reader needs.
+This document defines a multi-agent pipeline that ingests a daily batch of around 250+ emails from a structured JSON archive, deduplicates and clusters them into semantic topics, analyzes each topic for context, sentiment and urgency, and finally generates two variations of executive summaries and interactive visual mindmaps — all grouped differently for different reader needs.
 
 ---
 
@@ -48,58 +48,39 @@ conv-variation1   conv-variation2
 -YYYYMMDD.json    -YYYYMMDD.json
      │               │
      └───────┬────────┘
-             │  (parallel from here)
-     ┌───────┴────────┐
-     ▼                ▼
-┌─────────┐      ┌─────────┐
-│Agent 3a │      │Agent 3b │   Conversation Analyst
-│Analyst  │      │Analyst  │   (V1 and V2 run in parallel)
-│Variation│      │Variation│
-│   1     │      │   2     │
-└────┬────┘      └────┬────┘
-     │                │
-     ▼                ▼
-insight-v1        insight-v2
--YYYYMMDD.json    -YYYYMMDD.json
-     │                │
-     ▼                ▼
-┌─────────┐      ┌─────────┐
-│Agent 4a │      │Agent 4b │   Executive Reporter
-│Reporter │      │Reporter │   (V1 and V2 run in parallel)
-│Variation│      │Variation│
-│   1     │      │   2     │
-└────┬────┘      └────┬────┘
-     │                │
-     ▼                ▼
-summary-v1        summary-v2
--YYYYMMDD.json    -YYYYMMDD.json
-     │                │
-     ▼                ▼
-┌─────────┐      ┌─────────┐
-│Agent 5a │      │Agent 5b │   Report Formatter  
-│Formatter│      │Formatter│   (V1 and V2 run in parallel)
-│Variation│      │Variation│
-│   1     │      │   2     │
-└────┬────┘      └────┬────┘
-     │                │
-     ▼                ▼
-report-v1        report-v2       ← Formatted report outputs
--YYYYMMDD.md    -YYYYMMDD.md
-     │                │
-     ▼                ▼
-┌─────────┐      ┌─────────┐
-│Agent 6a │      │Agent 6b │   Mindmap Visualizer
-│Visualize│      │Visualize│   (V1 and V2 run in parallel)
-│Variation│      │Variation│
-│   1     │      │   2     │
-└────┬────┘      └────┬────┘
-     │                │
-     ▼                ▼
-mindmap-v1        mindmap-v2
--YYYYMMDD.html    -YYYYMMDD.html
+             │  (Parallel Branches Start Here)
+     ┌───────┴───────────────────────────────┐
+     ▼                                       ▼
+┌─────────┐                             ┌─────────┐
+│Agent 3a │                             │Agent 3b │
+│Analyst  │                             │Analyst  │
+│Variation│                             │Variation│
+│   1     │                             │   2     │
+└────┬────┘                             └────┬────┘
+     │ insight-v1-YYYYMMDD.json              │ insight-v2-YYYYMMDD.json
+     ├──────────────────────┐                ├──────────────────────┐
+     ▼                      │                ▼                      │
+┌─────────┐                 │           ┌─────────┐                 │
+│Agent 4a │                 │           │Agent 4b │                 │
+│Reporter │                 │           │Reporter │                 │
+│Variation│                 │           │Variation│                 │
+│   1     │                 │           │   2     │                 │
+└────┬────┘                 │           └────┬────┘                 │
+     │ summary-v1.json      │                │ summary-v2.json      │
+     ├──────────────┐       │                ├──────────────┐       │
+     ▼              ▼       ▼                ▼              ▼       ▼
+┌─────────┐    ┌──────────────┐         ┌─────────┐    ┌──────────────┐
+│Agent 5a │    │   Agent 6a   │         │Agent 5b │    │   Agent 6b   │
+│Formatter│    │  Visualize   │         │Formatter│    │  Visualize   │
+│Variation│    │  Variation 1 │         │Variation│    │  Variation 2 │
+│   1     │    └──────────────┘         │   2     │    └──────────────┘
+└────┬────┘           │                 └────┬────┘           │
+     ▼                ▼                      ▼                ▼
+report-v1.md     mindmap-v1.html        report-v2.md     mindmap-v2.html
+(Human Report)   (Interactive)          (Human Report)   (Interactive)
 ```
 
-**Process Mode:** Sequential between Agent 1 → 2 → (3a ∥ 3b) → (4a ∥ 4b) → (5a ∥ 5b) → (6a ∥ 6b)
+**Process Mode:** Sequential between Agent 1 → 2 → (3a ∥ 3b) → (4a ∥ 4b) → [(5a ∥ 5a) ∥ (6a ∥ 6b)]
 
 ---
 
@@ -187,10 +168,10 @@ Each element in the root array is an email object with at minimum the following 
 **Model:** Light model (e.g., `mistral-nemo` via Ollama) combined with a local embedding model (e.g., `nomic-embed-text`) for vector similarity clustering.
 
 **Backstory:**
-You are an expert at finding the "hidden story" buried across hundreds of emails. You know that ten emails titled differently can all be about the same broken deployment, and that two emails with the same subject line can be about entirely different matters. You approach deduplication scientifically: you use semantic embeddings to cluster first, then use language reasoning to verify and label each cluster.
+You are an expert at finding the "hidden story" buried across hundreds of emails. You know that although emails with same subject is likely to have same context but there is also a possibility where ten emails titled differently can all be about the same broken deployment, and that two emails with the same subject line can be about entirely different matters. You approach deduplication scientifically: you use semantic embeddings to cluster first, then use language reasoning to verify and label each cluster.
 
 **Goal:**
-Read the raw email archive for the given date. Normalize subjects, compute semantic embeddings for each email (subject + body combined), cluster similar emails into topic groups using cosine similarity, then use LLM reasoning to validate each cluster, assign a descriptive topic title, and resolve any misclassified emails. Output a flat, deduplicated list of topic clusters.
+Read the raw email archive for the given date. Normalize subjects, compute `semantic embeddings` for each email (subject + body combined), cluster similar emails into topic groups using `cosine similarity`, then use LLM reasoning to validate each cluster, assign a descriptive topic title, and resolve any misclassified emails. Output a flat, deduplicated list of topic clusters.
 
 **Priority Filter (applied during clustering):**
 Emails that are pure calendar invites with no substantive body, automated system alerts with no human action content, or marketing/newsletter emails with no project or client category tags should be flagged as `"type": "noise"` and excluded from downstream processing but retained in the output file for auditability.
@@ -375,7 +356,7 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 **Tasks:**
 
-1. Read the assigned conversation file (`variation1` or `variation2`).
+1. Read the assigned conversation file (`variation1` or `variation2`) created by the Hierarchical Grouper agent (i.e. Agent 2 with Role: Conversation Thread Hierarchical Organizer). Essentially, Agent 3a processes the conversation file with variation 1 and Agent 3b processes the conversation file with variation 2.
 
 2. For each Topic cluster, read **all emails** in that cluster as a unified conversation thread, ordered chronologically by `receivedOn`.
 
@@ -461,7 +442,7 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 **Tasks:**
 
-1. Read the assigned insight file.
+1. Read the assigned insight file created by the two Conversation Analyzers (3a & 3b). Essentially, Agent 4a processes the insight file created by Agent 3a and Agent 4b processes the insight file created by Agent 3b.
 
 2. For each Client (Variation 1) or Project (Variation 2), iterate over each sub-group.
 
@@ -529,7 +510,7 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 **Tasks:**
 
-1. Read `./data/insight-variation1-YYYYMMDD.json` and `./data/summary-variation1-YYYYMMDD.json` (Agent 5a) or their Variation 2 equivalents (Agent 5b).
+1. Read the insight file and summary file created by earlier agents. Essentially, Agent 5a reads `./data/insight-variation1-YYYYMMDD.json` created by agent 3a and `./data/summary-variation1-YYYYMMDD.json` created by agent 4a. Similarly, Agent 5b reads `./data/insight-variation2-YYYYMMDD.json` created by agent 3b and `./data/summary-variation2-YYYYMMDD.json` created by agent 4b.
 
 2. Render the formatted report JSON as follows. Use this exact structure:
 
@@ -627,7 +608,7 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 **Tasks:**
 
-1. Read the assigned summary JSON file and insight JSON file.
+1. Read the insight file and summary file created by earlier agents (3a, 3b, 4a, 4b). Essentially, Agent 6a reads `./data/insight-variation1-YYYYMMDD.json` created by agent 3a and `./data/summary-variation1-YYYYMMDD.json` created by agent 4a. Similarly, Agent 6b reads `./data/insight-variation2-YYYYMMDD.json` created by agent 3b and `./data/summary-variation2-YYYYMMDD.json` created by agent 4b.
 
 2. Build the node tree:
    - **Root:** `"Daily Summary — YYYY-MM-DD"`

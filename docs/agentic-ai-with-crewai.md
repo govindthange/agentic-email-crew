@@ -1,4 +1,4 @@
-> This section contains all the prompts for phase 2 of the project. LLM should not process this file.
+> This section contains all the prompts for phase 3 of the project. LLM should not process this file.
 
 This architecture is a perfect evolution of your current microservices setup. Since you already have a service generating daily JSON files, adding an agentic layer is essentially creating a **"Processor Service"** that consumes those files and produces high-level insights.
 
