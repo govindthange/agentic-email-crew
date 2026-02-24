@@ -2,14 +2,20 @@
 
   <categories>
     <!-- Values are the exact strings that appear in the email `category` field -->
-    <category name="client"  values="AB, YB, ACME, GLOBAL" />
-    <category name="project" values="cba, asba, apy, phoenix, sentinel" />
-    <category name="team"    values="sales, accounts, elt, engineering, devops" />
+    <category name="client"  values="^AB,^ACL,^AU,^BB,^CI,^CSB,^CSFB,^CUB,^ESFB,^FB,^IDFC,^JSFB,^KMB,^Krntk,^KVB,^SB,^SIB,^UB,^UBS,^YB" />
+    <category name="project" values="apy,asba,cba,ipo,logistics,pm" />
+    <category name="team"    values="sales,accounts,invoice,hr" />
   </categories>
 
   <settings>
     <setting name="archiveDir"         value="./data/archives" />
     <setting name="outputDir"          value="./data" />
+    <!-- 
+      dedupeThreshold: Sets the cosine similarity limit (0.0 to 1.0) for clustering emails.
+      Usage: Used by the EmailClusteringTool to determine if two emails belong to the same topic.
+      Mechanism: 1.0 is identical, higher values result in more tight/granular clusters, 
+                 lower values combine more varied emails into the same group. 
+    -->
     <setting name="dedupeThreshold"    value="0.82" />
     <!-- Active profile selection: 'small' or 'large' -->
     <setting name="modelProfile"       value="small" />

@@ -51,7 +51,7 @@ services:
       - ./crewai-insight-service/logs:/app/logs
       - ./email-reader-service/data:/app/data/archives
       - ./config:/app/config
-      - ./data:/app/data
+      - ./crewai-insight-service/data:/app/data
     environment:
       - CONFIG_PATH=/app/config/agent-config.xml
       - DATA_DIR=/app/data

@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from datetime import datetime
 from contextlib import asynccontextmanager
 
@@ -37,10 +38,24 @@ class StreamToLogger:
         self.logger = logger
         self.level = level
         self.original_stream = original_stream
+        self.ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
     def write(self, buf):
-        for line in buf.rstrip().splitlines():
-            self.logger.log(self.level, line.rstrip())
+        # Remove ANSI codes and log cleaned lines
+        clean_buf = self.ansi_escape.sub('', buf)
+        for line in clean_buf.splitlines():
+            strip_line = line.strip()
+            if not strip_line: continue
+            
+            # Heuristic: LiteLLM often prints INFO to stderr. Detect and re-level.
+            actual_level = self.level
+            if self.level == logging.ERROR:
+                upper_line = strip_line.upper()
+                info_keywords = ["INFO", "SUCCESS", "COMPLETED", "DEBUG", "COMPLETION", "OLLAMA", "LITELLM", "MODEL"]
+                if any(kw in upper_line for kw in info_keywords):
+                    actual_level = logging.INFO
+            
+            self.logger.log(actual_level, strip_line)
         self.original_stream.write(buf)
 
     def flush(self):

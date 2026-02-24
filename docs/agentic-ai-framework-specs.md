@@ -99,8 +99,8 @@ All category definitions are declared here. Agents must read this file at startu
   </categories>
 
   <settings>
-    <setting name="archiveDir"         value="./data/archives" />
-    <setting name="outputDir"          value="./data" />
+    <setting name="archiveDir"         value="./crewai-insight-service/data/archives" />
+    <setting name="outputDir"          value="./crewai-insight-service/data" />
     <setting name="dedupeThreshold"    value="0.82" />
     <setting name="llmModelHeavy"      value="qwen2.5:32b" />
     <setting name="llmModelLight"      value="mistral-nemo" />

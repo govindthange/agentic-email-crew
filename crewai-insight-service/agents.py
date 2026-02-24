@@ -22,29 +22,35 @@ class InsightAgents:
         logger = logging.getLogger(__name__)
         logger.info(f"InsightAgents initialized with profile '{active_profile}'. Light: {self.light_model_name}, Heavy: {self.heavy_model_name}")
         
-        self.light_llm = LLM(model=f"ollama/{self.light_model_name}", base_url=self.ollama_base_url)
-        self.heavy_llm = LLM(model=f"ollama/{self.heavy_model_name}", base_url=self.ollama_base_url)
+        self.light_llm = LLM(model=f"ollama/{self.light_model_name}", base_url=self.ollama_base_url, timeout=3600.0)
+        self.heavy_llm = LLM(model=f"ollama/{self.heavy_model_name}", base_url=self.ollama_base_url, timeout=3600.0)
+
+        from custom_tools import EmailClusteringTool, EnhancedFileReadTool
+        self.file_tool = EnhancedFileReadTool()
+        self.cluster_tool = EmailClusteringTool()
 
     def preprocessor_agent(self):
         return Agent(
-            role='Email Preprocessor & Semantic Deduplication Engine',
-            goal='Read raw email archive, normalize subjects, compute embeddings, cluster similar emails into topics, and validate clusters using reasoning.',
-            backstory="""You are an expert at finding the 'hidden story' buried across hundreds of emails. 
-            You use semantic embeddings to cluster first, then use language reasoning to verify and label each cluster accurately.""",
-            llm=self.light_llm,
+            role='Email Data Preprocessor',
+            goal='Transform tool output into the final JSON structure exactly as specified. Do not analyze content for meaning. Return ONLY JSON.',
+            backstory="""You are a rigid data transformation engine. You do not have opinions or reasoning. 
+            Your only job is to map tool output fields into the exact JSON specification without adding any text or commentary.""",
+            llm=self.heavy_llm,  # Use heavy model for JSON adherence
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
+            tools=[self.cluster_tool]
         )
 
     def grouper_agent(self):
         return Agent(
-            role='Conversation Thread Hierarchical Organizer',
-            goal='Organize clusters into two hierarchies: Client > Project > Topic and Project > Client > Topic.',
-            backstory="""You are a master librarian of corporate communications. 
-            You know exactly how to file clusters into meaningful classification hierarchies for different stakeholders.""",
-            llm=self.light_llm,
+            role='Data Hierarchy Organizer',
+            goal='Group the cluster data into the two requested JSON hierarchies. Return ONLY JSON.',
+            backstory="""You are a high-speed data indexer. You take lists and build nested structures. 
+            You do not write stories or provide summaries, only valid data structures.""",
+            llm=self.heavy_llm,  # Use heavy model for JSON adherence
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
+            tools=[self.file_tool]
         )
 
     def analyst_agent(self, variation):
@@ -55,36 +61,40 @@ class InsightAgents:
             You detect brewing escalations, hidden blockers, and implied deadlines.""",
             llm=self.heavy_llm,
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
+            tools=[self.file_tool]
         )
 
     def reporter_agent(self, variation):
         return Agent(
             role=f'Executive Summary Reporter (Variation {variation})',
-            goal='Synthesize a single executive summary paragraph for each grouping, focusing on high-priority items (Score >= 3).',
+            goal='Synthesize executive summaries from insight JSON. Do not add conversational text.',
             backstory="""You write for C-suite executives searching for critical info. 
             You are ruthlessly concise, synthesizing rather than transcribing.""",
             llm=self.heavy_llm,
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
+            tools=[self.file_tool]
         )
 
     def formatter_agent(self, variation):
         return Agent(
             role=f'Executive Report Formatter (Variation {variation})',
-            goal='Merge insights and summaries into a clean, readable Markdown report with summary statistics.',
+            goal='Read insights and summaries, then return a final Markdown report. Do not add conversational text.',
             backstory="""You are a precision formatter. You render structured JSON data into beautiful Markdown faithfully.""",
-            llm=self.light_llm,
+            llm=self.heavy_llm,  # Use heavy model for complex formatting
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
+            tools=[self.file_tool]
         )
 
     def visualizer_agent(self, variation):
         return Agent(
             role=f'Interactive Mindmap Visualizer (Variation {variation})',
-            goal='Generate a self-contained HTML mindmap using D3.js based on the hierarchical insights.',
+            goal='Create a self-contained D3.js HTML mindmap based on insight JSON. Use tool to read data.',
             backstory="""You specialize in interactive HTML visualizations that need no external dependencies (other than D3.js).""",
             llm=self.light_llm,
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
+            tools=[self.file_tool]
         )

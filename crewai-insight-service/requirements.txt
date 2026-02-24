@@ -1,4 +1,5 @@
 crewai
+crewai-tools
 langchain
 langchain-community
 langchain-ollama
