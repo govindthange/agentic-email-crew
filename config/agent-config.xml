@@ -1,0 +1,25 @@
+<agent-config>
+
+  <categories>
+    <!-- Values are the exact strings that appear in the email `category` field -->
+    <category name="client"  values="AB, YB, ACME, GLOBAL" />
+    <category name="project" values="cba, asba, apy, phoenix, sentinel" />
+    <category name="team"    values="sales, accounts, elt, engineering, devops" />
+  </categories>
+
+  <settings>
+    <setting name="archiveDir"         value="./data/archives" />
+    <setting name="outputDir"          value="./data" />
+    <setting name="dedupeThreshold"    value="0.82" />
+    <!-- Active profile selection: 'small' or 'large' -->
+    <setting name="modelProfile"       value="small" />
+    <setting name="ollamaBaseUrl"      value="http://ollama:11434" />
+    <setting name="escalationKeywords" value="urgent,escalate,blocker,critical,overdue,SLA,deadline,penalty,invoice,PO,proposal" />
+  </settings>
+
+  <profiles>
+    <profile name="small" heavy="llama3.1:8b" light="mistral" />
+    <profile name="large" heavy="qwen2.5:32b" light="mistral-nemo" />
+  </profiles>
+
+</agent-config>

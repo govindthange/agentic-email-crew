@@ -40,3 +40,33 @@ services:
     depends_on:
       - email-reader-ui
       - email-reader-service
+
+  crewai-insight-service:
+    build:
+      context: ./crewai-insight-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./crewai-insight-service/logs:/app/logs
+      - ./email-reader-service/data:/app/data/archives
+      - ./config:/app/config
+      - ./data:/app/data
+    environment:
+      - CONFIG_PATH=/app/config/agent-config.xml
+      - DATA_DIR=/app/data
+      - OPENAI_API_KEY=NA
+    depends_on:
+      - email-reader-service
+      - ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agentic-email-crew-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama
+    restart: always
