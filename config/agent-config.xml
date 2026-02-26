@@ -21,6 +21,9 @@
     <setting name="modelProfile"       value="small" />
     <setting name="ollamaBaseUrl"      value="http://ollama:11434" />
     <setting name="escalationKeywords" value="urgent,escalate,blocker,critical,overdue,SLA,deadline,penalty,invoice,PO,proposal" />
+    <setting name="emailBodyLimit"     value="1000" />
+    <setting name="toolOutputLimit"    value="50000" />
+    <setting name="fileReadLimit"      value="120000" />
   </settings>
 
   <profiles>

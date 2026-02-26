@@ -67,17 +67,18 @@ class EmailInsightCrew:
         
         logger.info(f"Clusters file created at: {abs_clusters_file}")
 
-        # 2. Grouping — pass clusters_file so Agent 2 knows exact path to read
+        # 2. Grouping — Run Variation 1 and Variation 2 as separate tasks for better reliability
         group_agent = self.agents.grouper_agent()
-        group_task = self.tasks.grouping_task(group_agent, abs_clusters_file, group_v1_file, group_v2_file)
+        group_v1_task = self.tasks.grouping_variation1_task(group_agent, abs_clusters_file, group_v1_file)
+        group_v2_task = self.tasks.grouping_variation2_task(group_agent, abs_clusters_file, group_v2_file)
         
         group_crew = Crew(
             agents=[group_agent],
-            tasks=[group_task],
+            tasks=[group_v1_task, group_v2_task],
             process=Process.sequential,
             embedder=self.embedder_config
         )
-        groups = group_crew.kickoff()
+        group_crew.kickoff()
         
         # Variation 1 Branch
         self._run_variation(1, group_v1_file, date_str, data_dir, abs_data_dir)

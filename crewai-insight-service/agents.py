@@ -25,17 +25,17 @@ class InsightAgents:
         self.light_llm = LLM(model=f"ollama/{self.light_model_name}", base_url=self.ollama_base_url, timeout=3600.0)
         self.heavy_llm = LLM(model=f"ollama/{self.heavy_model_name}", base_url=self.ollama_base_url, timeout=3600.0)
 
-        from custom_tools import EmailClusteringTool, EnhancedFileReadTool
+        from custom_tools import EmailClusteringTool, EnhancedFileReadTool, HierarchicalGroupingTool
         self.file_tool = EnhancedFileReadTool()
         self.cluster_tool = EmailClusteringTool()
+        self.group_tool = HierarchicalGroupingTool()
 
     def preprocessor_agent(self):
         return Agent(
             role='Email Data Preprocessor',
-            goal='Transform tool output into the final JSON structure exactly as specified. Do not analyze content for meaning. Return ONLY JSON.',
-            backstory="""You are a rigid data transformation engine. You do not have opinions or reasoning. 
-            Your only job is to map tool output fields into the exact JSON specification without adding any text or commentary.""",
-            llm=self.heavy_llm,  # Use heavy model for JSON adherence
+            goal='Cluster emails and save to file using tools. Do not analyze content. Output SUCCESS.',
+            backstory="""You are a data processing unit. You rely on tools to transform raw email archives into clean clusters.""",
+            llm=self.heavy_llm,
             verbose=True,
             allow_delegation=False,
             tools=[self.cluster_tool]
@@ -44,13 +44,12 @@ class InsightAgents:
     def grouper_agent(self):
         return Agent(
             role='Data Hierarchy Organizer',
-            goal='Group the cluster data into the two requested JSON hierarchies. Return ONLY JSON.',
-            backstory="""You are a high-speed data indexer. You take lists and build nested structures. 
-            You do not write stories or provide summaries, only valid data structures.""",
-            llm=self.heavy_llm,  # Use heavy model for JSON adherence
+            goal='Group cluster data into hierarchies using specified tools. Output SUCCESS.',
+            backstory="""You are a specialist in hierarchical data organization. You use tools to re-index topic clusters into Client/Project views.""",
+            llm=self.heavy_llm,
             verbose=True,
             allow_delegation=False,
-            tools=[self.file_tool]
+            tools=[self.group_tool]
         )
 
     def analyst_agent(self, variation):
@@ -82,7 +81,7 @@ class InsightAgents:
             role=f'Executive Report Formatter (Variation {variation})',
             goal='Read insights and summaries, then return a final Markdown report. Do not add conversational text.',
             backstory="""You are a precision formatter. You render structured JSON data into beautiful Markdown faithfully.""",
-            llm=self.heavy_llm,  # Use heavy model for complex formatting
+            llm=self.heavy_llm,
             verbose=True,
             allow_delegation=False,
             tools=[self.file_tool]
