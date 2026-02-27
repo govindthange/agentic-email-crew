@@ -60,9 +60,14 @@ def _normalize_subject(subject: str) -> str:
     return s.strip()
 
 def _clean_body(body: str) -> str:
-    """Basic cleanup of email body."""
+    """Basic cleanup of email body, stripping HTML tags and excess whitespace."""
     if not body: return ""
-    cleaned = re.sub(r'\n\s*\n', '\n', body)
+    # Strip HTML tags
+    cleaned = re.sub(r'<[^>]+>', ' ', body)
+    # Decode common HTML entities (minimal)
+    cleaned = cleaned.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+    # Cleanup whitespace
+    cleaned = re.sub(r'\s+', ' ', cleaned)
     return cleaned.strip()
 
 def _is_noise(email: dict) -> bool:
