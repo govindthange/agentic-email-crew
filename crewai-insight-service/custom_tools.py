@@ -60,14 +60,44 @@ def _normalize_subject(subject: str) -> str:
     return s.strip()
 
 def _clean_body(body: str) -> str:
-    """Basic cleanup of email body, stripping HTML tags and excess whitespace."""
+    """Basic cleanup of email body, stripping trailing threads, HTML tags and excess whitespace."""
     if not body: return ""
-    # Strip HTML tags
+
+    # 1. Truncate trailing reply threads before HTML stripping
+    # Common markers for the start of a reply/forward thread (Generic for Outlook, Gmail, etc.)
+    markers = [
+        r'<hr[^>]*>',                               # HTML horizontal rule
+        r'id="(?:divRplyFwdMsg|appendonsend)"',     # Outlook specific identifiers
+        r'-----\s*(?:Original Message|Forwarded message)\s*-----', # Common text markers
+        r'On\s+.*?\s+wrote:',                       # Gmail/Mobile "On [date], [user] wrote:"
+        r'________________________________',        # Horizontal line divider
+        # Generic header block: detects a sequence of email headers like From/To/Subject
+        # Works for most clients by looking for two or more headers in close proximity.
+        r'(?:From|To|Subject|Date|Sent|Cc):\s+.*?\n\s*(?:From|To|Subject|Date|Sent|Cc):'
+    ]
+    
+    for marker in markers:
+        match = re.search(marker, body, re.IGNORECASE | re.DOTALL)
+        if match:
+            # For header blocks, we want to make sure we don't truncate at the very beginning 
+            # if the body somehow contains headers (unlikely but safe).
+            if match.start() > 10: 
+                body = body[:match.start()]
+                break
+
+    # 2. Strip HTML tags
     cleaned = re.sub(r'<[^>]+>', ' ', body)
-    # Decode common HTML entities (minimal)
+    
+    # 3. Decode common HTML entities (minimal)
     cleaned = cleaned.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
-    # Cleanup whitespace
-    cleaned = re.sub(r'\s+', ' ', cleaned)
+    
+    # 4. Cleanup whitespace
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
+    # 5. Remove garbled/invisible characters (like \u034f, \u00ad, zero-width spaces/joiners)
+    # These often appear in automated/marketing emails.
+    cleaned = re.sub(r'[\u034f\u00ad\u200b\u200c\u200d\u200e\u200f\ufeff]', '', cleaned)
+    
     return cleaned.strip()
 
 def _is_noise(email: dict) -> bool:
