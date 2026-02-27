@@ -356,7 +356,7 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 **Tasks:**
 
-1. Read the assigned conversation file (`variation1` or `variation2`) created by the Hierarchical Grouper agent (i.e. Agent 2 with Role: Conversation Thread Hierarchical Organizer). Essentially, Agent 3a processes the conversation file with variation 1 and Agent 3b processes the conversation file with variation 2.
+1. Agent 3a and Agent 3b would work in parallel and read the assigned conversation files (`variation1` or `variation2`) created by the Hierarchical Grouper agent (i.e. Agent 2 with Role: Conversation Thread Hierarchical Organizer) in previous step. Agent 3a processes the variation 1 conversation file which is `./data/conversation-variation1-YYYYMMDD.json` and Agent 3b processes the variation 2 conversation file which is `./data/conversation-variation2-YYYYMMDD.json`.
 
 2. For each Topic cluster, read **all emails** in that cluster as a unified conversation thread, ordered chronologically by `receivedOn`.
 
@@ -401,7 +401,7 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 }
 ```
 
-10. Output `./data/insight-variation1-YYYYMMDD.json` (Agent 3a) preserving the full Client → Project → Topic hierarchy but replacing the `emails` array in each topic with the insight object above:
+10. Agent 3a outputs `./data/insight-variation1-YYYYMMDD.json` preserving the full Client → Project → Topic hierarchy but replacing the `emails` array in each topic with the insight object created in above step #9:
 
 ```jsonc
 {
