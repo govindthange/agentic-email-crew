@@ -5,6 +5,7 @@ import os
 import re
 import json
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -67,24 +68,68 @@ class EmailInsightCrew:
         
         logger.info(f"Clusters file created at: {abs_clusters_file}")
 
-        # 2. Grouping — Run Variation 1 and Variation 2 as separate tasks for better reliability
-        group_agent = self.agents.grouper_agent()
-        group_v1_task = self.tasks.grouping_variation1_task(group_agent, abs_clusters_file, group_v1_file)
-        group_v2_task = self.tasks.grouping_variation2_task(group_agent, abs_clusters_file, group_v2_file)
-        
-        group_crew = Crew(
-            agents=[group_agent],
-            tasks=[group_v1_task, group_v2_task],
-            process=Process.sequential,
-            embedder=self.embedder_config
+        # 2. Grouping — Call HierarchicalGroupingTool DIRECTLY (no LLM wrapper).
+        # The tool is pure deterministic Python: calling it via a CrewAI agent lets
+        # the LLM hallucinate SUCCESS without ever invoking the tool (confirmed in logs).
+        # Direct Python call is identical to the EmailClusteringTool pattern for Agent 1.
+        from custom_tools import HierarchicalGroupingTool
+        group_tool = HierarchicalGroupingTool()
+
+        abs_v1_file = os.path.join(abs_data_dir, f"conversation-variation1-{date_str}.json")
+        abs_v2_file = os.path.join(abs_data_dir, f"conversation-variation2-{date_str}.json")
+
+        logger.info(f"Grouping: calling HierarchicalGroupingTool directly for Variation 1 → {abs_v1_file}")
+        result_v1 = group_tool._run(
+            clusters_file=abs_clusters_file,
+            output_file=abs_v1_file,
+            variation=1
         )
-        group_crew.kickoff()
-        
-        # Variation 1 Branch
-        self._run_variation(1, group_v1_file, date_str, data_dir, abs_data_dir)
-        
-        # Variation 2 Branch
-        self._run_variation(2, group_v2_file, date_str, data_dir, abs_data_dir)
+        logger.info(f"Grouping V1 result: {result_v1}")
+        if not result_v1.startswith("SUCCESS"):
+            logger.error(f"Grouping Variation 1 failed: {result_v1}. Halting pipeline.")
+            return
+
+        logger.info(f"Grouping: calling HierarchicalGroupingTool directly for Variation 2 → {abs_v2_file}")
+        result_v2 = group_tool._run(
+            clusters_file=abs_clusters_file,
+            output_file=abs_v2_file,
+            variation=2
+        )
+        logger.info(f"Grouping V2 result: {result_v2}")
+        if not result_v2.startswith("SUCCESS"):
+            logger.error(f"Grouping Variation 2 failed: {result_v2}. Halting pipeline.")
+            return
+
+        if not os.path.exists(abs_v1_file):
+            logger.error(f"Variation 1 conversation file not found at {abs_v1_file} after grouping. Halting.")
+            return
+        if not os.path.exists(abs_v2_file):
+            logger.error(f"Variation 2 conversation file not found at {abs_v2_file} after grouping. Halting.")
+            return
+
+        # 3. Analysis — run Variation 1 then Variation 2 sequentially.
+        # Analysis is now pure deterministic Python (<10ms per variation),
+        # so threading adds zero benefit and only increases complexity.
+        from custom_tools import ConversationAnalysisTool
+        analysis_tool = ConversationAnalysisTool()
+
+        for var_num, var_file in [(1, abs_v1_file), (2, abs_v2_file)]:
+            insight_file = os.path.join(abs_data_dir, f"insight-variation{var_num}-{date_str}.json")
+            logger.info(f"Agent 3{'a' if var_num == 1 else 'b'}: analysing {var_file} → {insight_file}")
+            try:
+                result = analysis_tool._run(
+                    conversation_file=var_file,
+                    output_file=insight_file
+                )
+                logger.info(f"Variation {var_num} result: {result}")
+                if not result.startswith("SUCCESS"):
+                    logger.error(f"Variation {var_num} analysis failed: {result}. Halting.")
+                    return
+            except Exception as exc:
+                logger.error(f"Variation {var_num} analysis raised exception: {exc}", exc_info=True)
+                return
+
+        logger.info("Both variation analyses completed.")
 
     def _run_variation(self, var_num, var_file, date_str, data_dir, abs_data_dir):
         analyst = self.agents.analyst_agent(var_num)

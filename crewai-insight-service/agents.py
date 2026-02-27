@@ -25,10 +25,11 @@ class InsightAgents:
         self.light_llm = LLM(model=f"ollama/{self.light_model_name}", base_url=self.ollama_base_url, timeout=3600.0)
         self.heavy_llm = LLM(model=f"ollama/{self.heavy_model_name}", base_url=self.ollama_base_url, timeout=3600.0)
 
-        from custom_tools import EmailClusteringTool, EnhancedFileReadTool, HierarchicalGroupingTool
+        from custom_tools import EmailClusteringTool, EnhancedFileReadTool, HierarchicalGroupingTool, ConversationAnalysisTool
         self.file_tool = EnhancedFileReadTool()
         self.cluster_tool = EmailClusteringTool()
         self.group_tool = HierarchicalGroupingTool()
+        self.analysis_tool = ConversationAnalysisTool()
 
     def preprocessor_agent(self):
         return Agent(
@@ -55,13 +56,17 @@ class InsightAgents:
     def analyst_agent(self, variation):
         return Agent(
             role=f'Conversation Context, Sentiment & Urgency Analyst (Variation {variation})',
-            goal='Analyze topic clusters holistically to produce structured insights: state, next step, owner, sentiment, escalation, and blockers.',
+            goal=(
+                f'Call the conversation_analysis_tool with the conversation_file and output_file '
+                f'arguments to analyze Variation {variation} topic clusters and produce the insight JSON file. '
+                f'Output the SUCCESS confirmation from the tool.'
+            ),
             backstory="""You excel at reading between the lines of corporate email threads. 
             You detect brewing escalations, hidden blockers, and implied deadlines.""",
             llm=self.heavy_llm,
             verbose=True,
             allow_delegation=False,
-            tools=[self.file_tool]
+            tools=[self.analysis_tool]
         )
 
     def reporter_agent(self, variation):

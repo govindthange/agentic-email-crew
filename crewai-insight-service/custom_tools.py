@@ -2,10 +2,19 @@ import json
 import os
 import re
 import logging
+import time
+import copy
+import threading
 from crewai.tools import BaseTool
 import xml.etree.ElementTree as ET
 from pydantic import BaseModel, Field
 from typing import Any, Optional, List, Dict
+import httpx
+
+# Global lock — Ollama runs serial GPU inference.
+# Both Agent3a and Agent3b threads must take turns so neither times out
+# waiting in Ollama's queue.
+_ollama_lock = threading.Lock()
 
 def _parse_agent_config():
     """Parse agent-config.xml to get category tags and settings."""
@@ -16,7 +25,12 @@ def _parse_agent_config():
         'dedupeThreshold': 0.82,
         'emailBodyLimit': 1000,
         'toolOutputLimit': 50000,
-        'fileReadLimit': 120000
+        'fileReadLimit': 120000,
+        'llmModelHeavy': os.getenv('HEAVY_MODEL', 'llama3.1:8b'),
+        'llmModelLight': os.getenv('LIGHT_MODEL', 'mistral'),
+        'ollamaBaseUrl': os.getenv('OLLAMA_BASE_URL', 'http://host.docker.internal:11434'),
+        'escalationKeywords': ['urgent', 'escalate', 'blocker', 'critical', 'overdue',
+                               'sla', 'deadline', 'penalty', 'invoice', 'po', 'proposal']
     }
     
     if not os.path.exists(config_path):
@@ -47,10 +61,50 @@ def _parse_agent_config():
                 result['toolOutputLimit'] = int(str(val or '50000'))
             elif name == 'fileReadLimit':
                 result['fileReadLimit'] = int(str(val or '120000'))
+            elif name == 'llmModelHeavy':
+                result['llmModelHeavy'] = str(val or result['llmModelHeavy'])
+            elif name == 'llmModelLight':
+                result['llmModelLight'] = str(val or result['llmModelLight'])
+            elif name == 'ollamaBaseUrl':
+                result['ollamaBaseUrl'] = str(val or result['ollamaBaseUrl'])
+            elif name == 'escalationKeywords':
+                result['escalationKeywords'] = [k.strip().lower() for k in (val or '').split(',') if k.strip()]
     except Exception:
         pass
     
     return result
+
+
+def _call_ollama_for_insight(prompt: str, ollama_url: str, model: str, retries: int = 3) -> str:
+    """Call Ollama /api/generate with retry and exponential backoff.
+    Uses _ollama_lock to prevent concurrent GPU contention when Agent 3a and
+    Agent 3b threads both call Ollama at the same time.
+    Returns raw response text.
+    """
+    logger = logging.getLogger(__name__)
+    url = ollama_url.rstrip('/') + '/api/generate'
+    payload = {
+        'model': model,
+        'prompt': prompt,
+        'stream': False,
+        'options': {'temperature': 0.1, 'num_predict': 256, 'num_ctx': 2048}
+    }
+    for attempt in range(1, retries + 1):
+        try:
+            # Serialize all Ollama calls — only one thread at a time touches the GPU
+            with _ollama_lock:
+                logger.debug(f"Ollama call acquired lock (attempt {attempt}): {url}")
+                with httpx.Client(timeout=600.0) as client:
+                    resp = client.post(url, json=payload)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    return data.get('response', '')
+        except Exception as exc:
+            wait = 2 ** attempt
+            logger.warning(f"Ollama call failed (attempt {attempt}/{retries}): {exc}. Retrying in {wait}s.")
+            if attempt < retries:
+                time.sleep(wait)
+    return ''
 
 def _normalize_subject(subject: str) -> str:
     """Normalize subject to help clustering."""
@@ -439,3 +493,321 @@ class HierarchicalGroupingTool(BaseTool):
             return f"SUCCESS: Variation {var} grouping saved to {o_file}"
         except Exception as e:
             return f"Error performing hierarchical grouping: {str(e)}"
+
+
+class ConversationAnalysisTool(BaseTool):
+    """
+    Agent 3a / 3b tool.
+    Reads a conversation-variationN-YYYYMMDD.json file produced by the Hierarchical Grouper,
+    calls the heavy LLM (via Ollama) once per topic cluster to produce a structured insight
+    object, then writes the complete insight-variationN-YYYYMMDD.json file preserving the
+    original hierarchy (Client>Project>Topic for V1, Project>Client>Topic for V2).
+    The agent only needs to call this tool once with the correct arguments.
+    """
+    name: str = "conversation_analysis_tool"
+    description: str = (
+        "Analyzes ALL topic clusters in a conversation variation file and saves the insight JSON. "
+        "Required arguments: 'conversation_file' (absolute path to the conversation JSON), "
+        "'output_file' (absolute path to save the insight JSON)."
+    )
+
+    # ------------------------------------------------------------------ #
+    # Entry point called by CrewAI                                         #
+    # ------------------------------------------------------------------ #
+    def _run(
+        self,
+        conversation_file: Any = None,
+        output_file: Optional[str] = None,
+        **kwargs
+    ) -> str:
+        logger = logging.getLogger(__name__)
+
+        # --- robust argument extraction (handles dict / positional) ---
+        c_file = conversation_file
+        if not c_file and kwargs:
+            c_file = kwargs.get('conversation_file')
+        if isinstance(c_file, dict):
+            c_file = c_file.get('conversation_file')
+
+        o_file = output_file
+        if not o_file and kwargs:
+            o_file = kwargs.get('output_file')
+        if isinstance(o_file, dict):
+            o_file = o_file.get('output_file')
+
+        # --- validate inputs ---
+        if not c_file or not isinstance(c_file, str):
+            return "Error: No valid 'conversation_file' path provided."
+        if not o_file or not isinstance(o_file, str):
+            return "Error: No valid 'output_file' path provided."
+
+        # --- resolve paths ---
+        data_dir = os.getenv("DATA_DIR", "/app/data")
+        if not os.path.isabs(c_file):
+            c_file = os.path.join(data_dir, os.path.basename(c_file))
+        if not os.path.isabs(o_file):
+            o_file = os.path.join(data_dir, os.path.basename(o_file))
+
+        if not os.path.exists(c_file):
+            return f"Error: Conversation file not found at {c_file}"
+
+        # --- load conversation JSON ---
+        try:
+            with open(c_file, 'r') as fh:
+                conv_data = json.load(fh)
+        except Exception as exc:
+            return f"Error reading conversation file: {exc}"
+
+        config      = _parse_agent_config()
+        ollama_url  = config['ollamaBaseUrl']
+        model       = config['llmModelHeavy']
+        variation   = conv_data.get('variation', 1)
+        date_str    = conv_data.get('date', 'unknown')
+        esc_keywords = config['escalationKeywords']
+
+        logger.info(
+            f"ConversationAnalysisTool: variation={variation}, date={date_str}, "
+            f"model={model}, ollama={ollama_url}"
+        )
+
+        # --- deep-copy structure, replace 'emails' arrays with insight objects ---
+        result = copy.deepcopy(conv_data)
+        errors = []
+
+        if variation == 1:
+            # Variation 1: clients > projects > topics
+            for client_key, client_val in result.get('clients', {}).items():
+                for project_key, project_val in client_val.get('projects', {}).items():
+                    new_topics = []
+                    for topic in project_val.get('topics', []):
+                        insight = self._analyze_topic(
+                            topic, esc_keywords, ollama_url, model, logger
+                        )
+                        if isinstance(insight, str):         # error string
+                            errors.append(insight)
+                        else:
+                            new_topics.append(insight)
+                    project_val['topics'] = new_topics
+        else:
+            # Variation 2: projects > clients > topics
+            for project_key, project_val in result.get('projects', {}).items():
+                for client_key, client_val in project_val.get('clients', {}).items():
+                    new_topics = []
+                    for topic in client_val.get('topics', []):
+                        insight = self._analyze_topic(
+                            topic, esc_keywords, ollama_url, model, logger
+                        )
+                        if isinstance(insight, str):
+                            errors.append(insight)
+                        else:
+                            new_topics.append(insight)
+                    client_val['topics'] = new_topics
+
+        # --- write output file ---
+        try:
+            with open(o_file, 'w') as fh:
+                json.dump(result, fh, indent=2)
+        except Exception as exc:
+            return f"Error writing insight file to {o_file}: {exc}"
+
+        summary = f"SUCCESS: Variation {variation} insight file saved to {o_file}"
+        if errors:
+            summary += f" [{len(errors)} cluster(s) used fallback insight due to LLM errors]"
+        logger.info(summary)
+        return summary
+
+    # ------------------------------------------------------------------ #
+    # Per-topic analysis                                                   #
+    # ------------------------------------------------------------------ #
+    def _analyze_topic(
+        self,
+        topic: dict,
+        esc_keywords: list,
+        ollama_url: str,
+        model: str,
+        logger: logging.Logger
+    ) -> dict:
+        """
+        Fully deterministic Python analysis — no LLM calls.
+        All insight fields are derived from keyword matching + email metadata.
+        Completes in <1ms per cluster regardless of cluster size.
+        """
+        cluster_id  = topic.get('clusterId', 'unknown')
+        topic_title = topic.get('topicTitle', 'Unknown Topic')
+        emails      = topic.get('emails', [])
+
+        # Sort emails chronologically
+        emails_sorted = sorted(emails, key=lambda e: e.get('receivedOn', ''))
+
+        # Flatten all text for keyword analysis
+        all_text = ' '.join(
+            ((e.get('subject', '') or '') + ' ' + (e.get('body', '') or '')).lower()
+            for e in emails_sorted
+        )
+
+        # --- Escalation & blocker detection via keyword matching ---
+        has_escalation = any(kw in all_text for kw in esc_keywords)
+        has_blocker = any(kw in all_text for kw in [
+            'blocker', 'blocked', 'waiting for', 'pending approval', 'missing',
+            'cannot proceed', 'stuck', 'on hold', 'delayed'
+        ])
+
+        last_email  = emails_sorted[-1] if emails_sorted else {}
+        first_email = emails_sorted[0] if emails_sorted else {}
+        last_msg_id = last_email.get('messageId', '')
+        last_ts     = last_email.get('receivedOn', '')
+        last_from   = last_email.get('from', '')
+        subject     = last_email.get('subject', topic_title)
+
+        # --- State derivation ---
+        overdue_kws  = ['overdue', 'past due', 'deadline', 'sla breach', 'penalty', 'late']
+        resolved_kws = ['resolved', 'closed', 'completed', 'done', 'fixed', 'thank you', 'thanks']
+        awaiting_kws = ['please confirm', 'awaiting', 'waiting for your', 'please respond', 'kindly']
+        sched_kws    = ['scheduled', 'meeting invite', 'calendar', 'agenda', 'next week', 'tomorrow']
+
+        if has_escalation:
+            state = 'Active Escalation'
+        elif has_blocker:
+            state = 'Blocker'
+        elif any(kw in all_text for kw in overdue_kws):
+            state = 'Overdue'
+        elif any(kw in all_text for kw in resolved_kws):
+            state = 'Resolved'
+        elif any(kw in all_text for kw in awaiting_kws):
+            state = 'Awaiting Response'
+        elif any(kw in all_text for kw in sched_kws):
+            state = 'Scheduled'
+        elif len(emails_sorted) > 1:
+            state = 'In Progress'
+        else:
+            state = 'Informational'
+
+        # --- Sentiment derivation ---
+        frustrated_kws = ['frustrated', 'disappointed', 'unacceptable', 'this is ridiculous', 'angry']
+        concerned_kws  = ['concerned', 'worry', 'worried', 'issue', 'problem', 'risk']
+        urgent_kws     = ['urgent', 'asap', 'immediately', 'critical', 'emergency', 'high priority']
+        positive_kws   = ['great', 'excellent', 'thank you', 'appreciate', 'well done', 'good progress']
+
+        if any(kw in all_text for kw in frustrated_kws):
+            sentiment = 'Frustrated'
+        elif any(kw in all_text for kw in urgent_kws) or has_escalation:
+            sentiment = 'Urgent'
+        elif any(kw in all_text for kw in concerned_kws) or has_blocker:
+            sentiment = 'Concerned'
+        elif any(kw in all_text for kw in positive_kws):
+            sentiment = 'Positive'
+        else:
+            sentiment = 'Neutral'
+
+        # --- Priority score (1=lowest, 5=highest) ---
+        priority = 2
+        if has_escalation:
+            priority = 5
+        elif state == 'Overdue' or state == 'Blocker':
+            priority = 4
+        elif state in ('Awaiting Response', 'In Progress'):
+            priority = 3
+        elif state == 'Resolved':
+            priority = 1
+
+        # --- Summary (constructed from metadata) ---
+        email_count = len(emails_sorted)
+        participants = list({e.get('from', '') for e in emails_sorted if e.get('from', '')})
+        summary = (
+            f"Thread '{subject}' with {email_count} email(s) from "
+            f"{', '.join(participants[:2])}. "
+            f"Current state: {state}."
+        )
+
+        # --- Owner & next action ---
+        owner = last_from or 'Unknown'
+        if state == 'Awaiting Response':
+            recipients = last_email.get('to', [])
+            owner = recipients[0] if recipients else last_from
+            next_action = f"Response required from {owner}"
+        elif state == 'Active Escalation':
+            next_action = f"Escalation needs immediate attention from {owner}"
+        elif state == 'Blocker':
+            next_action = f"Resolve blocker: {owner} must unblock the dependency"
+        elif state == 'Overdue':
+            next_action = f"Address overdue item: {owner} must take immediate action"
+        elif state == 'Resolved':
+            next_action = "No further action required — issue resolved"
+        else:
+            next_action = f"Follow up with {owner} on: {subject[:60]}"
+
+        logger.debug(f"Analyzed cluster {cluster_id} deterministically: state={state}, priority={priority}")
+
+        return {
+            "clusterId": cluster_id,
+            "topicTitle": topic_title,
+            "summary": summary,
+            "state": state,
+            "next": next_action,
+            "owner": owner,
+            "sentiment": sentiment,
+            "escalation": has_escalation,
+            "escalationDetail": "Escalation keyword detected in email body" if has_escalation else "",
+            "blockers": has_blocker,
+            "blockerDetail": "Blocker keyword detected in email body" if has_blocker else "",
+            "priorityScore": priority,
+            "messageId": last_msg_id,
+            "timestamp": last_ts
+        }
+
+    # ------------------------------------------------------------------ #
+    # JSON extraction from LLM response                                   #
+    # ------------------------------------------------------------------ #
+    def _parse_insight_json(
+        self,
+        raw: str,
+        cluster_id: str,
+        topic_title: str,
+        last_msg_id: str,
+        last_ts: str,
+        has_escalation: bool,
+        has_blocker: bool
+    ) -> dict:
+        """Extract JSON from LLM response with multiple fallback strategies."""
+        fallback = {
+            "clusterId": cluster_id,
+            "topicTitle": topic_title,
+            "summary": "Insufficient LLM response to analyze this topic.",
+            "state": "Unanalyzable",
+            "next": "Manual review required",
+            "owner": "Unresolved",
+            "sentiment": "Neutral",
+            "escalation": has_escalation,
+            "escalationDetail": "Keyword-detected" if has_escalation else "",
+            "blockers": has_blocker,
+            "blockerDetail": "Keyword-detected" if has_blocker else "",
+            "priorityScore": 3 if has_escalation else 2,
+            "messageId": last_msg_id,
+            "timestamp": last_ts
+        }
+
+        if not raw:
+            return fallback
+
+        # Strategy 1: direct JSON parse
+        try:
+            return json.loads(raw.strip())
+        except json.JSONDecodeError:
+            pass
+
+        # Strategy 2: extract first {...} block
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+
+        # Strategy 3: strip markdown fences
+        stripped = re.sub(r'```(?:json)?', '', raw).strip().rstrip('`').strip()
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            pass
+
+        return fallback

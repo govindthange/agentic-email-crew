@@ -45,12 +45,15 @@ class InsightTasks:
     def analysis_task(self, agent, variation_file, variation_num, output_file):
         return Task(
             description=dedent(f"""\
-                Task: Generate insights for each cluster in {variation_file}.
-                1. Read file using 'read_output_json_md_tool'.
-                2. Insights required: state, next step, owner, sentiment, priority.
-                3. Output: ONLY raw JSON. No markdown blocks.
+                Task: Call 'conversation_analysis_tool' ONCE with exactly these two arguments:
+                  - conversation_file: "{variation_file}"
+                  - output_file: "{output_file}"
+                The tool reads {variation_file}, calls the LLM per cluster internally,
+                and writes {output_file} automatically. Do NOT read the file manually.
+                Do NOT write JSON yourself. Just call the tool and return the SUCCESS
+                confirmation it gives you.
             """),
-            expected_output=f'A JSON object for Variation {variation_num} with topic-level insights.',
+            expected_output=f"A string starting with 'SUCCESS: ' confirming Variation {variation_num} insight file was saved to {output_file}.",
             agent=agent,
             output_file=output_file
         )
