@@ -26,6 +26,8 @@ def _parse_agent_config():
         'emailBodyLimit': 1000,
         'toolOutputLimit': 50000,
         'fileReadLimit': 120000,
+        'modelProfile': 'small',
+        'summaryLogic': 'code',
         'llmModelHeavy': os.getenv('HEAVY_MODEL', 'llama3.1:8b'),
         'llmModelLight': os.getenv('LIGHT_MODEL', 'mistral'),
         'ollamaBaseUrl': os.getenv('OLLAMA_BASE_URL', 'http://host.docker.internal:11434'),
@@ -50,6 +52,14 @@ def _parse_agent_config():
                 result['projectTags'] = values
                 
         # Parse Settings
+        profiles_map = {}
+        for profile in root.findall('.//profile'):
+            p_name = profile.get('name')
+            profiles_map[p_name] = {
+                'heavy': profile.get('heavy'),
+                'light': profile.get('light')
+            }
+
         for setting in root.findall('.//setting'):
             name = setting.get('name')
             val = setting.get('value')
@@ -61,6 +71,10 @@ def _parse_agent_config():
                 result['toolOutputLimit'] = int(str(val or '50000'))
             elif name == 'fileReadLimit':
                 result['fileReadLimit'] = int(str(val or '120000'))
+            elif name == 'modelProfile':
+                result['modelProfile'] = str(val or 'small')
+            elif name == 'summaryLogic':
+                result['summaryLogic'] = str(val or 'code')
             elif name == 'llmModelHeavy':
                 result['llmModelHeavy'] = str(val or result['llmModelHeavy'])
             elif name == 'llmModelLight':
@@ -69,6 +83,14 @@ def _parse_agent_config():
                 result['ollamaBaseUrl'] = str(val or result['ollamaBaseUrl'])
             elif name == 'escalationKeywords':
                 result['escalationKeywords'] = [k.strip().lower() for k in (val or '').split(',') if k.strip()]
+
+        # Resolve models from profile if configured
+        active_profile = result.get('modelProfile')
+        if active_profile in profiles_map:
+            p_cfg = profiles_map[active_profile]
+            if p_cfg.get('heavy'): result['llmModelHeavy'] = p_cfg['heavy']
+            if p_cfg.get('light'): result['llmModelLight'] = p_cfg['light']
+
     except Exception:
         pass
     
@@ -560,14 +582,16 @@ class ConversationAnalysisTool(BaseTool):
 
         config      = _parse_agent_config()
         ollama_url  = config['ollamaBaseUrl']
-        model       = config['llmModelHeavy']
+        model_heavy = config['llmModelHeavy']
+        model_light = config['llmModelLight']
+        summary_logic = config['summaryLogic']
         variation   = conv_data.get('variation', 1)
         date_str    = conv_data.get('date', 'unknown')
         esc_keywords = config['escalationKeywords']
 
         logger.info(
             f"ConversationAnalysisTool: variation={variation}, date={date_str}, "
-            f"model={model}, ollama={ollama_url}"
+            f"heavy={model_heavy}, light={model_light}, logic={summary_logic}, ollama={ollama_url}"
         )
 
         # --- deep-copy structure, replace 'emails' arrays with insight objects ---
@@ -581,7 +605,7 @@ class ConversationAnalysisTool(BaseTool):
                     new_topics = []
                     for topic in project_val.get('topics', []):
                         insight = self._analyze_topic(
-                            topic, esc_keywords, ollama_url, model, logger
+                            topic, esc_keywords, ollama_url, model_heavy, model_light, summary_logic, logger
                         )
                         if isinstance(insight, str):         # error string
                             errors.append(insight)
@@ -595,7 +619,7 @@ class ConversationAnalysisTool(BaseTool):
                     new_topics = []
                     for topic in client_val.get('topics', []):
                         insight = self._analyze_topic(
-                            topic, esc_keywords, ollama_url, model, logger
+                            topic, esc_keywords, ollama_url, model_heavy, model_light, summary_logic, logger
                         )
                         if isinstance(insight, str):
                             errors.append(insight)
@@ -624,13 +648,13 @@ class ConversationAnalysisTool(BaseTool):
         topic: dict,
         esc_keywords: list,
         ollama_url: str,
-        model: str,
+        model_heavy: str,
+        model_light: str,
+        summary_logic: str,
         logger: logging.Logger
     ) -> dict:
         """
-        Fully deterministic Python analysis — no LLM calls.
-        All insight fields are derived from keyword matching + email metadata.
-        Completes in <1ms per cluster regardless of cluster size.
+        Insight analysis with configurable summary logic.
         """
         cluster_id  = topic.get('clusterId', 'unknown')
         topic_title = topic.get('topicTitle', 'Unknown Topic')
@@ -653,7 +677,6 @@ class ConversationAnalysisTool(BaseTool):
         ])
 
         last_email  = emails_sorted[-1] if emails_sorted else {}
-        first_email = emails_sorted[0] if emails_sorted else {}
         last_msg_id = last_email.get('messageId', '')
         last_ts     = last_email.get('receivedOn', '')
         last_from   = last_email.get('from', '')
@@ -710,14 +733,30 @@ class ConversationAnalysisTool(BaseTool):
         elif state == 'Resolved':
             priority = 1
 
-        # --- Summary (constructed from metadata) ---
+        # --- Summary Generation ---
         email_count = len(emails_sorted)
         participants = list({e.get('from', '') for e in emails_sorted if e.get('from', '')})
-        summary = (
-            f"Thread '{subject}' with {email_count} email(s) from "
-            f"{', '.join(participants[:2])}. "
-            f"Current state: {state}."
-        )
+        
+        summary = None
+        if summary_logic == "none":
+            summary = ""
+        elif summary_logic == "llm-local-mini":
+            summary = self._generate_llm_summary(emails_sorted, topic_title, ollama_url, model_light, logger)
+        elif summary_logic == "llm-local-large":
+            summary = self._generate_llm_summary(emails_sorted, topic_title, ollama_url, model_heavy, logger)
+        elif summary_logic == "llm-api-gemini":
+            summary = self._generate_api_summary(emails_sorted, topic_title, "gemini", logger)
+        elif summary_logic == "llm-api-openai":
+            # This calls OpenAI ChatGPT API (gpt-4o-mini) via LiteLLM
+            summary = self._generate_api_summary(emails_sorted, topic_title, "openai", logger)
+        
+        # If any LLM summary failed or logic is "code" (or default), use deterministic
+        if summary is None or summary_logic == "code":
+            summary = (
+                f"Thread '{subject[:60]}' with {email_count} email(s) from "
+                f"{', '.join(participants[:2]) or 'unknown'}. "
+                f"Current state: {state}."
+            )
 
         # --- Owner & next action ---
         owner = last_from or 'Unknown'
@@ -736,7 +775,7 @@ class ConversationAnalysisTool(BaseTool):
         else:
             next_action = f"Follow up with {owner} on: {subject[:60]}"
 
-        logger.debug(f"Analyzed cluster {cluster_id} deterministically: state={state}, priority={priority}")
+        logger.debug(f"Analyzed cluster {cluster_id} for logic '{summary_logic}': state={state}, priority={priority}")
 
         return {
             "clusterId": cluster_id,
@@ -755,8 +794,76 @@ class ConversationAnalysisTool(BaseTool):
             "timestamp": last_ts
         }
 
+    def _generate_llm_summary(self, emails_sorted, topic_title, ollama_url, model, logger):
+        """Use local LLM via Ollama to generate a 2-3 sentence executive summary."""
+        try:
+            thread_text = []
+            for i, em in enumerate(emails_sorted, 1):
+                body = (em.get('body', '') or '')[:500]
+                thread_text.append(f"[{i}] {em.get('from')} - {em.get('subject')}\n{body}")
+            
+            prompt = (
+                f"Synthesize a 2-3 sentence executive summary of this email thread titled '{topic_title}'.\n"
+                f"Focus on core issue, current status and next steps.\n"
+                f"Be concise. Do not use conversational filler. Return ONLY the summary.\n\n"
+                f"Thread Content:\n" + "\n---\n".join(thread_text) + "\n\n"
+                f"EXECUTIVE SUMMARY:"
+            )
+            
+            summary = _call_ollama_for_insight(prompt, ollama_url, model)
+            return summary.strip()
+        except Exception as exc:
+            logger.error(f"Error in local LLM summary: {exc}")
+            return None
+
+    def _generate_api_summary(self, emails_sorted, topic_title, provider, logger):
+        """Use API-based LLM (Gemini/OpenAI) via LiteLLM to generate a summary."""
+        try:
+            import litellm
+            thread_text = []
+            for i, em in enumerate(emails_sorted, 1):
+                body = (em.get('body', '') or '')[:800]
+                thread_text.append(f"[{i}] {em.get('from')} - {em.get('subject')}\n{body}")
+
+            prompt = (
+                f"Synthesize a 2-3 sentence executive summary of this email thread titled '{topic_title}'.\n"
+                f"Focus on core issue and status. Be professional and concise.\n\n"
+                f"Thread Content:\n" + "\n---\n".join(thread_text) + "\n\n"
+                f"EXECUTIVE SUMMARY:"
+            )
+
+            model_map = {
+                "gemini": "gemini/gemini-1.5-pro",
+                "openai": "gpt-4o-mini"
+            }
+            env_map = {
+                "gemini": "GEMINI_API_KEY",
+                "openai": "OPENAI_API_KEY"
+            }
+            
+            model_name = model_map.get(provider)
+            api_key = os.getenv(env_map.get(provider))
+            
+            if not api_key or api_key == "NA":
+                logger.warning(f"{provider.capitalize()} API key not set or NA.")
+                return None
+            
+            response = litellm.completion(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                api_key=api_key
+            )
+            return response.choices[0].message.content.strip()
+            
+        except ImportError:
+            logger.error("litellm module not found. Cannot perform API summary.")
+            return None
+        except Exception as exc:
+            logger.error(f"Error calling {provider} API: {exc}")
+            return None
+
     # ------------------------------------------------------------------ #
-    # JSON extraction from LLM response                                   #
+    # JSON extraction from LLM response                                  #
     # ------------------------------------------------------------------ #
     def _parse_insight_json(
         self,

@@ -55,7 +55,9 @@ services:
     environment:
       - CONFIG_PATH=/app/config/agent-config.xml
       - DATA_DIR=/app/data
-      - OPENAI_API_KEY=NA
+      - OPENAI_API_KEY=NA   # <--- Configure OpenAI key here
+      - GEMINI_API_KEY=your_key_here # <--- You can add Gemini key here
+
     depends_on:
       - email-reader-service
       - ollama

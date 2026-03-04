@@ -24,6 +24,7 @@
     <setting name="emailBodyLimit"     value="1000" />
     <setting name="toolOutputLimit"    value="50000" />
     <setting name="fileReadLimit"      value="120000" />
+    <setting name="summaryLogic"       value="llm-local-mini" />
   </settings>
 
   <profiles>
