@@ -102,6 +102,10 @@ class InsightTasks:
                    - Style: Plain English, newsfeed highlight style, NO bullet points.
                    - Content: Most critical issue, current state, active blockers/escalations (with owner names), financial items (invoices/POs) status, and recommended action.
                 
+                Step 5 (CRITICAL): Plan the output.
+                   - First, think step-by-step about the keys needed for the {active_grouping} hierarchy.
+                   - Ensure Variation {variation_num} structure is followed: {'Client > Project' if variation_num == 1 else 'Project > Client'}.
+
                 Final Output Requirement:
                 - Output ONLY the raw JSON matching this structure:
                 {target_structure}
