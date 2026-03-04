@@ -107,11 +107,10 @@ class EmailInsightCrew:
             logger.error(f"Variation 2 conversation file not found at {abs_v2_file} after grouping. Halting.")
             return
 
-        # 3. Analysis — run Variation 1 then Variation 2 sequentially.
-        # Analysis is now pure deterministic Python (<10ms per variation),
-        # so threading adds zero benefit and only increases complexity.
+        # 3. Analysis — run Variation 1 then Variation 2 sequentially using tool.
         from custom_tools import ConversationAnalysisTool
         analysis_tool = ConversationAnalysisTool()
+        variation_insights = {}
 
         for var_num, var_file in [(1, abs_v1_file), (2, abs_v2_file)]:
             insight_file = os.path.join(abs_data_dir, f"insight-variation{var_num}-{date_str}.json")
@@ -121,43 +120,82 @@ class EmailInsightCrew:
                     conversation_file=var_file,
                     output_file=insight_file
                 )
-                logger.info(f"Variation {var_num} result: {result}")
+                logger.info(f"Variation {var_num} analysis result: {result}")
                 if not result.startswith("SUCCESS"):
                     logger.error(f"Variation {var_num} analysis failed: {result}. Halting.")
                     return
+                variation_insights[var_num] = insight_file
             except Exception as exc:
                 logger.error(f"Variation {var_num} analysis raised exception: {exc}", exc_info=True)
                 return
 
-        logger.info("Both variation analyses completed.")
+        logger.info("Both variation analyses completed. Proceeding to Reporting (Agent 4).")
 
-    def _run_variation(self, var_num, var_file, date_str, data_dir, abs_data_dir):
-        analyst = self.agents.analyst_agent(var_num)
-        reporter = self.agents.reporter_agent(var_num)
-        formatter = self.agents.formatter_agent(var_num)
-        visualizer = self.agents.visualizer_agent(var_num)
+        # 4. Reporting (Agent 4a and 4b) — Must finish before Agents 5/6 start.
+        summary_files = {}
+        execution_mode = self.agents.config.get_setting("agentExecutionMode", "sequential")
+        logger.info(f"Agent Reporting Execution Mode: {execution_mode}")
         
-        # Relative paths for CrewAI output_file
-        insight_file = os.path.join(data_dir, f"insight-variation{var_num}-{date_str}.json")
-        summary_file = os.path.join(data_dir, f"summary-variation{var_num}-{date_str}.json")
-        report_file = os.path.join(data_dir, f"report-variation{var_num}-{date_str}.md")
-        mindmap_file = os.path.join(data_dir, f"mindmap-variation{var_num}-{date_str}.html")
+        def run_reporter(v_num, ins_file):
+            logger.info(f"Starting Reporter Agent 4{'a' if v_num == 1 else 'b'} for Variation {v_num}")
+            agent = self.agents.reporter_agent(v_num)
+            # Relative path for CrewAI output to avoid path issues
+            rel_summary = os.path.join(data_dir, f"summary-variation{v_num}-{date_str}.json")
+            task = self.tasks.reporting_task(agent, ins_file, v_num, rel_summary)
+            crew = Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config)
+            crew.kickoff()
+            summary_files[v_num] = os.path.join(abs_data_dir, f"summary-variation{v_num}-{date_str}.json")
+            logger.info(f"Reporter Agent 4{'a' if v_num == 1 else 'b'} finished.")
 
-        # Absolute paths for task descriptions  
-        abs_var_file = os.path.join(abs_data_dir, os.path.basename(var_file))
-        abs_insight_file = os.path.join(abs_data_dir, f"insight-variation{var_num}-{date_str}.json")
-        abs_summary_file = os.path.join(abs_data_dir, f"summary-variation{var_num}-{date_str}.json")
+        if execution_mode == "parallel":
+            report_threads = []
+            for v_num in [1, 2]:
+                t = threading.Thread(target=run_reporter, args=(v_num, variation_insights[v_num]))
+                t.start()
+                report_threads.append(t)
+            for t in report_threads:
+                t.join()
+        else:
+            # Sequential (default)
+            for v_num in [1, 2]:
+                run_reporter(v_num, variation_insights[v_num])
+            
+        logger.info("All Reporting (Agent 4) completed. Starting Formatting and Visualization (Agents 5/6).")
 
-        # Each variation runs as its own crew with sequential tasks
-        var_crew = Crew(
-            agents=[analyst, reporter, formatter, visualizer],
-            tasks=[
-                self.tasks.analysis_task(analyst, abs_var_file, var_num, insight_file),
-                self.tasks.reporting_task(reporter, abs_insight_file, var_num, summary_file),
-                self.tasks.formatting_task(formatter, abs_insight_file, abs_summary_file, var_num, report_file),
-                self.tasks.visualization_task(visualizer, abs_insight_file, var_num, mindmap_file)
-            ],
-            process=Process.sequential,
-            embedder=self.embedder_config
-        )
-        return var_crew.kickoff()
+        # 5. Formatting (Agent 5) and Visualization (Agent 6) — Parallel execution.
+        final_threads = []
+        
+        def run_formatter(v_num, ins_file, sum_file):
+            logger.info(f"Starting Formatter Agent 5{'a' if v_num == 1 else 'b'} for Variation {v_num}")
+            agent = self.agents.formatter_agent(v_num)
+            rel_report = os.path.join(data_dir, f"report-variation{v_num}-{date_str}.md")
+            abs_sum_file = os.path.join(abs_data_dir, os.path.basename(sum_file))
+            task = self.tasks.formatting_task(agent, ins_file, abs_sum_file, v_num, rel_report)
+            Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
+            logger.info(f"Formatter Agent 5{'a' if v_num == 1 else 'b'} finished.")
+
+        def run_visualizer(v_num, ins_file, sum_file):
+            logger.info(f"Starting Visualizer Agent 6{'a' if v_num == 1 else 'b'} for Variation {v_num}")
+            agent = self.agents.visualizer_agent(v_num)
+            rel_mindmap = os.path.join(data_dir, f"mindmap-variation{v_num}-{date_str}.html")
+            abs_sum_file = os.path.join(abs_data_dir, os.path.basename(sum_file))
+            task = self.tasks.visualization_task(agent, ins_file, abs_sum_file, v_num, rel_mindmap)
+            Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
+            logger.info(f"Visualizer Agent 6{'a' if v_num == 1 else 'b'} finished.")
+
+        for v_num in [1, 2]:
+            ins_file = variation_insights[v_num]
+            sum_file = summary_files[v_num]
+            
+            t5 = threading.Thread(target=run_formatter, args=(v_num, ins_file, sum_file))
+            t5.start()
+            final_threads.append(t5)
+            
+            t6 = threading.Thread(target=run_visualizer, args=(v_num, ins_file, sum_file))
+            t6.start()
+            final_threads.append(t6)
+            
+        for t in final_threads:
+            t.join()
+            
+        logger.info(f"Pipeline completed successfully for date {date_str}.")

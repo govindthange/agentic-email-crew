@@ -59,13 +59,57 @@ class InsightTasks:
         )
 
     def reporting_task(self, agent, insight_file, variation_num, output_file):
+        grouping_v1 = "Client > Project"
+        grouping_v2 = "Project > Client"
+        active_grouping = grouping_v1 if variation_num == 1 else grouping_v2
+        
+        target_structure = dedent(f"""
+            {{
+              "date": "YYYYMMDD",
+              "variation": {variation_num},
+              "grouping": "{active_grouping} > Executive Summary",
+              "{'clients' if variation_num == 1 else 'projects'}": {{
+                "NAME": {{
+                  "{'projects' if variation_num == 1 else 'clients'}": {{
+                    "SUB_NAME": {{
+                      "{'client' if variation_num == 1 else 'project'}": "NAME",
+                      "{'project' if variation_num == 1 else 'client'}": "SUB_NAME",
+                      "executiveSummary": "3-6 sentences covering critical issues, blockers, and actions.",
+                      "highestPriorityScore": 5,
+                      "totalTopics": 10,
+                      "totalEmails": 50,
+                      "topicsIncluded": ["cluster-001", "cluster-002"],
+                      "topicsExcluded": ["cluster-005"]
+                    }}
+                  }}
+                }}
+              }}
+            }}
+        """)
+
         return Task(
             description=dedent(f"""\
-                Task: Write executive summaries for {insight_file}.
-                1. Read file using 'read_output_json_md_tool'.
-                2. Output: ONLY raw JSON. No markdown blocks.
+                Task: Read {insight_file} and synthesize executive summaries for Variation {variation_num}.
+                
+                Step 1: Use 'read_output_json_md_tool' to read EVERYTHING from: {insight_file}
+                Step 2: Traverse the hierarchy ({active_grouping}). 
+                Step 3: For each sub-group (the leaf node containing 'topics'):
+                   - Filter: Only topics with priorityScore >= 3 are used for the summary.
+                   - Topics with priorityScore <= 2 are excluded from the summary but tracked in 'topicsExcluded'.
+                   - If NO topics meet the threshold (>=3), the summary MUST be: "No high-priority items identified under this grouping for YYYYMMDD."
+                Step 4: Synthesize a single executive summary paragraph for the sub-group:
+                   - Length: 3-6 sentences. 
+                   - Style: Plain English, newsfeed highlight style, NO bullet points.
+                   - Content: Most critical issue, current state, active blockers/escalations (with owner names), financial items (invoices/POs) status, and recommended action.
+                
+                Final Output Requirement:
+                - Output ONLY the raw JSON matching this structure:
+                {target_structure}
+                - 'totalTopics' and 'totalEmails' must be the aggregate sums from the original topics list (including excluded ones).
+                - 'highestPriorityScore' is the max score found in that sub-group.
+                - Do NOT include markdown code blocks (```json) or conversational text. Return ONLY the JSON object.
             """),
-            expected_output=f'A JSON object for Variation {variation_num} containing executive summaries.',
+            expected_output=f'A JSON object for Variation {variation_num} containing executive summaries mapped to the hierarchy.',
             agent=agent,
             output_file=output_file
         )
@@ -82,11 +126,11 @@ class InsightTasks:
             output_file=output_file
         )
 
-    def visualization_task(self, agent, insight_file, variation_num, output_file):
+    def visualization_task(self, agent, insight_file, summary_file, variation_num, output_file):
         return Task(
             description=dedent(f"""\
                 Task: Generate a D3.js HTML mindmap for {insight_file}.
-                1. Read {insight_file} using 'read_output_json_md_tool'.
+                1. Read {insight_file} and {summary_file} using 'read_output_json_md_tool'.
                 2. Output: Raw HTML/JS code.
             """),
             expected_output=f'An HTML mindmap for Variation {variation_num}.',

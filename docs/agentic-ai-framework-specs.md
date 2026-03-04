@@ -442,7 +442,7 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 **Tasks:**
 
-1. Read the assigned insight file created by the two Conversation Analyzers (3a & 3b). Essentially, Agent 4a processes the insight file created by Agent 3a and Agent 4b processes the insight file created by Agent 3b.
+1. Read the assigned insight file created by the two Conversation Analyzers (3a & 3b). Essentially, Agent 4a processes the insight-variation1-YYYYMMDD.json file created by Agent 3a and Agent 4b processes insight-variation2-YYYYMMDD.json file created by Agent 3b.
 
 2. For each Client (Variation 1) or Project (Variation 2), iterate over each sub-group.
 
@@ -454,7 +454,7 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
    - Any financial items (PO, invoice, proposal) and their status.
    - The collective recommended action or watch item for leadership.
 
-5. The summary must be 3–6 sentences maximum. Use plain English. No bullet points within the summary text. Use names and specifics, not vague terms.
+5. The summary must be 3–6 sentences maximum. Use plain English. No bullet points within the summary text. Use names and specifics, not vague terms and report like newsfeed highlights.
 
 6. Build the executive summary object per sub-group:
 
@@ -464,12 +464,14 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
   "project": "cba",        // sub-group key
   "executiveSummary": "The CBA project for client AB is facing a critical server migration blocker: DB connection failures have been unresolved for 3 days despite three follow-ups, and the client CTO has now been CC'd, indicating an imminent escalation. Raj Mehta (DevOps) is the assigned owner and must deliver the DB config diff by EOD Thursday. Additionally, Invoice #INV-2025-088 for $42,000 remains unpaid and overdue by 12 days — accounts team action required. No proposal or PO items are outstanding for this grouping.",
   "highestPriorityScore": 5,
+  "totalTopics": 2,
+  "totalEmails": 12,
   "topicsIncluded": ["cluster-001", "cluster-007"],
   "topicsExcluded": ["cluster-012"]   // low priority, excluded from executive view
 }
 ```
 
-7. Output `./data/summary-variation1-YYYYMMDD.json` (Agent 4a):
+7. Agent 4a outputs `./data/summary-variation1-YYYYMMDD.json`:
 
 ```jsonc
 {

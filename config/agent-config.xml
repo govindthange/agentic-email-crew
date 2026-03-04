@@ -25,6 +25,7 @@
     <setting name="toolOutputLimit"    value="50000" />
     <setting name="fileReadLimit"      value="120000" />
     <setting name="summaryLogic"       value="llm-local-mini" />
+    <setting name="agentExecutionMode" value="sequential" />
   </settings>
 
   <profiles>
