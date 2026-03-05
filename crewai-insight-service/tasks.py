@@ -5,12 +5,14 @@ class InsightTasks:
     def preprocessing_task(self, agent, input_file, output_file):
         return Task(
             description=dedent(f"""\
-                Task: Run 'semantic_email_clustering_tool' on: {input_file} 
-                and save the output directly to {output_file}.
+                Task: You MUST CALL the 'semantic_email_clustering_tool' on: {input_file}.
                 Required arguments: file_path="{input_file}", output_file="{output_file}"
-                Expected Result: A confirmation string starting with 'SUCCESS: '.
+                
+                CRITICAL: Do NOT just return a SUCCESS message. You MUST execute the tool.
+                The tool will perform the calculations and write the file. 
+                Your only job is to trigger the tool and report the result it gives you.
             """),
-            expected_output="A confirmation string starting with 'SUCCESS: '.",
+            expected_output="A confirmation string starting with 'SUCCESS: ' returned directly from the tool.",
             agent=agent
         )
 
@@ -31,14 +33,16 @@ class InsightTasks:
     def grouping_variation2_task(self, agent, clusters_file, output_file):
         return Task(
             description=dedent(f"""\
-                Task: Run 'hierarchical_grouping_tool' for Variation 2.
+                Task: You MUST CALL the 'hierarchical_grouping_tool' for Variation 2.
                 Inputs: 
                 - clusters_file: {clusters_file}
                 - output_file: {output_file}
                 - variation: 2
-                Expected Result: SUCCESS message.
+                
+                CRITICAL: Do NOT simulate the result. You MUST trigger the tool.
+                The tool will verify the data and write the file.
             """),
-            expected_output="A confirmation string starting with 'SUCCESS: '.",
+            expected_output="A confirmation string starting with 'SUCCESS: ' returned directly from the tool.",
             agent=agent
         )
 
@@ -58,62 +62,54 @@ class InsightTasks:
             output_file=output_file
         )
 
-    def reporting_task(self, agent, insight_file, variation_num, output_file):
-        grouping_v1 = "Client > Project"
-        grouping_v2 = "Project > Client"
-        active_grouping = grouping_v1 if variation_num == 1 else grouping_v2
+    def reporting_task(self, agent, data_context, variation_num, output_file):
+        primary_key = "clients" if variation_num == 1 else "projects"
+        secondary_key = "projects" if variation_num == 1 else "clients"
+        hierarchy_desc = "Client Name -> Projects -> Project Name" if variation_num == 1 else "Project Name -> Clients -> Client Name"
         
-        target_structure = dedent(f"""
-            {{
-              "date": "YYYYMMDD",
-              "variation": {variation_num},
-              "grouping": "{active_grouping} > Executive Summary",
-              "{'clients' if variation_num == 1 else 'projects'}": {{
-                "NAME": {{
-                  "{'projects' if variation_num == 1 else 'clients'}": {{
-                    "SUB_NAME": {{
-                      "{'client' if variation_num == 1 else 'project'}": "NAME",
-                      "{'project' if variation_num == 1 else 'client'}": "SUB_NAME",
-                      "executiveSummary": "3-6 sentences covering critical issues, blockers, and actions.",
-                      "highestPriorityScore": 5,
-                      "totalTopics": 10,
-                      "totalEmails": 50,
-                      "topicsIncluded": ["cluster-001", "cluster-002"],
-                      "topicsExcluded": ["cluster-005"]
-                    }}
-                  }}
-                }}
-              }}
-            }}
-        """)
-
         return Task(
             description=dedent(f"""\
-                Task: Read {insight_file} and synthesize executive summaries for Variation {variation_num}.
+                Task: Synthesize executive summaries for Variation {variation_num} ({hierarchy_desc}).
                 
-                Step 1: Use 'read_output_json_md_tool' to read EVERYTHING from: {insight_file}
-                Step 2: Traverse the hierarchy ({active_grouping}). 
-                Step 3: For each sub-group (the leaf node containing 'topics'):
-                   - Filter: Only topics with priorityScore >= 3 are used for the summary.
-                   - Topics with priorityScore <= 2 are excluded from the summary but tracked in 'topicsExcluded'.
-                   - If NO topics meet the threshold (>=3), the summary MUST be: "No high-priority items identified under this grouping for YYYYMMDD."
-                Step 4: Synthesize a single executive summary paragraph for the sub-group:
-                   - Length: 3-6 sentences. 
-                   - Style: Plain English, newsfeed highlight style, NO bullet points.
-                   - Content: Most critical issue, current state, active blockers/escalations (with owner names), financial items (invoices/POs) status, and recommended action.
+                INPUT DATA:
+                {data_context}
                 
-                Step 5 (CRITICAL): Plan the output.
-                   - First, think step-by-step about the keys needed for the {active_grouping} hierarchy.
-                   - Ensure Variation {variation_num} structure is followed: {'Client > Project' if variation_num == 1 else 'Project > Client'}.
+                DIRECTIONS:
+                1. Use ONLY the data provided above. Do NOT use any external tools.
+                2. Build the JSON for Variation {variation_num}.
+                
+                SUMMARIZATION RULES:
+                - Target: All 'summary' fields from topics where 'priorityScore' >= 3.
+                - Action: Synthesize these into a SINGLE "Executive News Briefing" paragraph.
+                - Style: Professional news briefing, bottom-line-first, active voice.
+                - Content Goal: Consolidate redundant information and highlight only the most critical status updates into a cohesive narrative.
+                - Fallback: If no topic >= 3, set summary to: "No high-priority items identified for this grouping."
+                - Length: 2-5 impactful sentences.
+                
+                REQUIRED JSON STRUCTURE:
+                The root object must contain: "date", "variation": {variation_num}, and "{primary_key}".
+                Inside "{primary_key}":
+                   - "NAME": {{
+                       "{secondary_key}": {{
+                          "SUB_NAME": {{
+                             "executiveSummary": "Your paragraph here (News Briefing style)",
+                             "highestPriorityScore": (Int),
+                             "totalTopics": (Int count of all clusters),
+                             "totalEmails": (Int count of all emails),
+                             "topicsIncluded": [List of cluster titles used in summary],
+                             "topicsExcluded": [List of cluster titles skipped]
+                          }}
+                       }}
+                   }}
 
-                Final Output Requirement:
-                - Output ONLY the raw JSON matching this structure:
-                {target_structure}
-                - 'totalTopics' and 'totalEmails' must be the aggregate sums from the original topics list (including excluded ones).
-                - 'highestPriorityScore' is the max score found in that sub-group.
-                - Do NOT include markdown code blocks (```json) or conversational text. Return ONLY the JSON object.
+                CRITICAL CONSTRAINTS (LOOP PREVENTION):
+                - DO NOT use any tools. Return your answer immediately.
+                - DO NOT include markdown code blocks (```json).
+                - DO NOT include ANY conversational text.
+                - YOU MUST start your response with the character '{{'.
+                - Output ONLY raw JSON matching the required structure.
             """),
-            expected_output=f'A JSON object for Variation {variation_num} containing executive summaries mapped to the hierarchy.',
+            expected_output=f"A raw JSON object for Variation {variation_num}. No markdown, no conversation, no placeholders.",
             agent=agent,
             output_file=output_file
         )

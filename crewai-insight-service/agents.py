@@ -78,7 +78,7 @@ class InsightAgents:
             llm=self.heavy_llm,
             verbose=True,
             allow_delegation=False,
-            tools=[self.file_tool]
+            tools=[]
         )
 
     def formatter_agent(self, variation):

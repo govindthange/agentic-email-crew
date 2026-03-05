@@ -123,9 +123,18 @@ class EmailInsightCrew:
                 return
 
             logger.info(f"Starting Reporter Agent 4{'a' if v_num == 1 else 'b'} for Variation {v_num}")
+            
+            # Read the insight data directly to pass as context
+            try:
+                with open(ins_file, 'r') as f:
+                    data_context = f.read()
+            except Exception as e:
+                logger.error(f"Failed to read insight file {ins_file}: {e}")
+                return
+
             agent = self.agents.reporter_agent(v_num)
             rel_summary = os.path.join(data_dir, f"summary-variation{v_num}-{date_str}.json")
-            task = self.tasks.reporting_task(agent, ins_file, v_num, rel_summary)
+            task = self.tasks.reporting_task(agent, data_context, v_num, rel_summary)
             Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
             logger.info(f"Reporter Agent 4{'a' if v_num == 1 else 'b'} finished.")
 
