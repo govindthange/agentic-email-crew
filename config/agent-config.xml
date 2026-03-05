@@ -29,8 +29,9 @@
   </settings>
 
   <profiles>
-    <profile name="small" heavy="llama3.1:8b" light="mistral" />
-    <profile name="large" heavy="qwen2.5:32b" light="mistral-nemo" />
+    <profile name="small"  heavy="llama3.1:8b"      light="mistral" />
+    <profile name="medium" heavy="mistral-nemo:latest" light="mistral" />
+    <profile name="large"  heavy="qwen2.5:32b"      light="mistral-nemo" />
   </profiles>
 
 </agent-config>
