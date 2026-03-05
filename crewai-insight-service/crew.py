@@ -153,8 +153,6 @@ class EmailInsightCrew:
         logger.info("Reporting phase complete. Starting Formatting and Visualization.")
 
         # 5. Formatting (Agent 5) and Visualization (Agent 6)
-        final_threads = []
-        
         def run_formatter(v_num, ins_file, sum_file):
             abs_report = os.path.join(abs_data_dir, f"report-variation{v_num}-{date_str}.md")
             if os.path.exists(abs_report):
@@ -179,19 +177,26 @@ class EmailInsightCrew:
             task = self.tasks.visualization_task(agent, ins_file, sum_file, v_num, rel_mindmap)
             Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
 
-        for v_num in [1, 2]:
-            ins_file = variation_insights[v_num]
-            sum_file = summary_files[v_num]
-            
-            t5 = threading.Thread(target=run_formatter, args=(v_num, ins_file, sum_file))
-            t5.start()
-            final_threads.append(t5)
-            
-            t6 = threading.Thread(target=run_visualizer, args=(v_num, ins_file, sum_file))
-            t6.start()
-            final_threads.append(t6)
-            
-        for t in final_threads:
-            t.join()
+        if execution_mode == "parallel":
+            for v_num in [1, 2]:
+                ins_file = variation_insights[v_num]
+                sum_file = summary_files[v_num]
+                
+                logger.info(f"Starting Variation {v_num} (Formatter + Visualizer) in parallel.")
+                t5 = threading.Thread(target=run_formatter, args=(v_num, ins_file, sum_file))
+                t6 = threading.Thread(target=run_visualizer, args=(v_num, ins_file, sum_file))
+                
+                t5.start()
+                t6.start()
+                t5.join()
+                t6.join()
+                logger.info(f"Variation {v_num} Formatting/Visualization complete.")
+        else:
+            # Sequential: 5a -> 6a -> 5b -> 6b
+            for v_num in [1, 2]:
+                ins_file = variation_insights[v_num]
+                sum_file = summary_files[v_num]
+                run_formatter(v_num, ins_file, sum_file)
+                run_visualizer(v_num, ins_file, sum_file)
             
         logger.info(f"Pipeline completed successfully for date {date_str}.")

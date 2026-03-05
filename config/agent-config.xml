@@ -25,6 +25,11 @@
     <setting name="toolOutputLimit"    value="50000" />
     <setting name="fileReadLimit"      value="120000" />
     <setting name="summaryLogic"       value="llm-local-mini" />
+    <!-- 
+      agentExecutionMode: Decides if Agents 5 and 6 run sequentially or in staged parallel groups.
+      - 'sequential': Runs Agent 5a -> 6a -> 5b -> 6b one at a time.
+      - 'parallel': Runs (5a & 6a) together, then after completion, runs (5b & 6b) together.
+    -->
     <setting name="agentExecutionMode" value="sequential" />
   </settings>
 

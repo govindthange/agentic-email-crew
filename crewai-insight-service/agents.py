@@ -97,7 +97,7 @@ class InsightAgents:
             role=f'Interactive Mindmap Visualizer (Variation {variation})',
             goal='Create a self-contained D3.js HTML mindmap based on insight JSON. Use tool to read data.',
             backstory="""You specialize in interactive HTML visualizations that need no external dependencies (other than D3.js).""",
-            llm=self.light_llm,
+            llm=self.heavy_llm,
             verbose=True,
             allow_delegation=False,
             tools=[self.file_tool]

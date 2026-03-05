@@ -115,13 +115,36 @@ class InsightTasks:
         )
 
     def formatting_task(self, agent, insight_file, summary_file, variation_num, output_file):
+        primary_key = "clients" if variation_num == 1 else "projects"
+        secondary_key = "projects" if variation_num == 1 else "clients"
+        hierarchy_desc = "Client -> Project -> Topic" if variation_num == 1 else "Project -> Client -> Topic"
+        
         return Task(
             description=dedent(f"""\
-                Task: Create a Markdown report for Variation {variation_num}.
-                1. Read {insight_file} and {summary_file} using 'read_output_json_md_tool'.
-                2. Format into a professional report.
+                Task: Create a Human-Readable Markdown Report for Variation {variation_num} ({hierarchy_desc}).
+                
+                STEPS:
+                1. Read {insight_file} and {summary_file} using ONLY 'read_output_json_md_tool'.
+                2. Merge the data into a single coherent report.
+                
+                REPORT STRUCTURE:
+                - Title: Executive Insight Report - Variation {variation_num} ({hierarchy_desc})
+                - For each {primary_key.rstrip('s')}:
+                    - Header level 1: {primary_key.rstrip('s').capitalize()} Name
+                    - For each {secondary_key.rstrip('s')}:
+                        - Header level 2: {secondary_key.rstrip('s').capitalize()} Name
+                        - Blockquote: Include the "executiveSummary" from the summary JSON here.
+                        - For each Topic in this group:
+                            - Header level 3: Topic Title
+                            - Section: Topic Summary, Owner, State, Next Action, Priority.
+                
+                CRITICAL CONSTRAINTS:
+                - DO NOT use any tools other than 'read_output_json_md_tool'.
+                - DO NOT use any tools like 'generate_report'. You must format it yourself.
+                - DO NOT include conversational filler like "Here is the report".
+                - Return ONLY the raw Markdown content.
             """),
-            expected_output=f'A Markdown report for Variation {variation_num}.',
+            expected_output=f'A complete Markdown report for Variation {variation_num} following the prescribed structure.',
             agent=agent,
             output_file=output_file
         )
@@ -129,11 +152,28 @@ class InsightTasks:
     def visualization_task(self, agent, insight_file, summary_file, variation_num, output_file):
         return Task(
             description=dedent(f"""\
-                Task: Generate a D3.js HTML mindmap for {insight_file}.
-                1. Read {insight_file} and {summary_file} using 'read_output_json_md_tool'.
-                2. Output: Raw HTML/JS code.
+                Task: Generate a Self-Contained D3.js HTML Mindmap for Variation {variation_num}.
+                
+                STEPS:
+                1. Read {insight_file} and {summary_file} using ONLY 'read_output_json_md_tool'.
+                2. Transform the hierarchical data into a single HTML file.
+                
+                VISUALIZATION REQUIREMENTS:
+                - Use vanilla D3.js (loaded via CDN, e.g., https://d3js.org/d3.v7.min.js).
+                - Root Node: "Daily Insights — Variation {variation_num}"
+                - Hierarchy: Follow the structure in {insight_file}.
+                - Interactivity: Nodes must be click-to-expand/collapse.
+                - Tooltips: Hovering a topic node shows its summary and priority.
+                - Color coding: Color nodes based on 'priorityScore' (1-5).
+                
+                CRITICAL CONSTRAINTS:
+                - The 'read_output_json_md_tool' is ONLY for reading input data. It CANNOT generate HTML.
+                - DO NOT attempt to call tools like 'generate_mindmap' or 'create_d3_mindmap'. YOU must write the full HTML code yourself.
+                - Return ONLY the raw HTML/JS code. Start with "<!DOCTYPE html>".
+                - DO NOT wrap the output in markdown backticks (```html).
+                - Use a high-quality D3.js tree or cluster layout with the requested interactivity.
             """),
-            expected_output=f'An HTML mindmap for Variation {variation_num}.',
+            expected_output=f'A single-file HTML mindmap for Variation {variation_num} with internal JS/CSS.',
             agent=agent,
             output_file=output_file
         )
