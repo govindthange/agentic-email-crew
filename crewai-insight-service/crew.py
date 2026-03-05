@@ -49,102 +49,84 @@ class EmailInsightCrew:
         pre_agent = self.agents.preprocessor_agent()
         pre_task = self.tasks.preprocessing_task(pre_agent, archive_file, clusters_file)
         
-        pre_crew = Crew(
-            agents=[pre_agent],
-            tasks=[pre_task],
-            process=Process.sequential,
-            embedder=self.embedder_config
-        )
-        clusters = pre_crew.kickoff()
+        if os.path.exists(abs_clusters_file):
+            logger.info(f"Skipping Preprocessing: {abs_clusters_file} already exists.")
+        else:
+            pre_crew = Crew(
+                agents=[pre_agent],
+                tasks=[pre_task],
+                process=Process.sequential,
+                embedder=self.embedder_config
+            )
+            pre_crew.kickoff()
         
-        # Verify clusters file was created before proceeding
+        # Ensure we have the clusters file (either pre-existing or just created)
         if not os.path.exists(abs_clusters_file):
-            # Also check relative path (in case CWD is /app)
+            # Check relative path as fallback
             if os.path.exists(clusters_file):
                 abs_clusters_file = os.path.abspath(clusters_file)
             else:
-                logger.error(f"Clusters file not created at {abs_clusters_file} or {clusters_file}. Halting pipeline.")
+                logger.error(f"Clusters file missing at {abs_clusters_file}. Halting pipeline.")
                 return
         
-        logger.info(f"Clusters file created at: {abs_clusters_file}")
+        logger.info(f"Clusters file ready: {abs_clusters_file}")
 
-        # 2. Grouping — Call HierarchicalGroupingTool DIRECTLY (no LLM wrapper).
-        # The tool is pure deterministic Python: calling it via a CrewAI agent lets
-        # the LLM hallucinate SUCCESS without ever invoking the tool (confirmed in logs).
-        # Direct Python call is identical to the EmailClusteringTool pattern for Agent 1.
+        # 2. Grouping
         from custom_tools import HierarchicalGroupingTool
         group_tool = HierarchicalGroupingTool()
 
         abs_v1_file = os.path.join(abs_data_dir, f"conversation-variation1-{date_str}.json")
         abs_v2_file = os.path.join(abs_data_dir, f"conversation-variation2-{date_str}.json")
 
-        logger.info(f"Grouping: calling HierarchicalGroupingTool directly for Variation 1 → {abs_v1_file}")
-        result_v1 = group_tool._run(
-            clusters_file=abs_clusters_file,
-            output_file=abs_v1_file,
-            variation=1
-        )
-        logger.info(f"Grouping V1 result: {result_v1}")
-        if not result_v1.startswith("SUCCESS"):
-            logger.error(f"Grouping Variation 1 failed: {result_v1}. Halting pipeline.")
-            return
+        for v_num, v_file in [(1, abs_v1_file), (2, abs_v2_file)]:
+            if os.path.exists(v_file):
+                logger.info(f"Skipping Grouping V{v_num}: {v_file} already exists.")
+            else:
+                logger.info(f"Grouping: calling HierarchicalGroupingTool for Variation {v_num} → {v_file}")
+                result = group_tool._run(clusters_file=abs_clusters_file, output_file=v_file, variation=v_num)
+                if not result.startswith("SUCCESS"):
+                    logger.error(f"Grouping Variation {v_num} failed: {result}. Halting.")
+                    return
 
-        logger.info(f"Grouping: calling HierarchicalGroupingTool directly for Variation 2 → {abs_v2_file}")
-        result_v2 = group_tool._run(
-            clusters_file=abs_clusters_file,
-            output_file=abs_v2_file,
-            variation=2
-        )
-        logger.info(f"Grouping V2 result: {result_v2}")
-        if not result_v2.startswith("SUCCESS"):
-            logger.error(f"Grouping Variation 2 failed: {result_v2}. Halting pipeline.")
-            return
-
-        if not os.path.exists(abs_v1_file):
-            logger.error(f"Variation 1 conversation file not found at {abs_v1_file} after grouping. Halting.")
-            return
-        if not os.path.exists(abs_v2_file):
-            logger.error(f"Variation 2 conversation file not found at {abs_v2_file} after grouping. Halting.")
-            return
-
-        # 3. Analysis — run Variation 1 then Variation 2 sequentially using tool.
+        # 3. Analysis
         from custom_tools import ConversationAnalysisTool
         analysis_tool = ConversationAnalysisTool()
         variation_insights = {}
 
         for var_num, var_file in [(1, abs_v1_file), (2, abs_v2_file)]:
             insight_file = os.path.join(abs_data_dir, f"insight-variation{var_num}-{date_str}.json")
-            logger.info(f"Agent 3{'a' if var_num == 1 else 'b'}: analysing {var_file} → {insight_file}")
-            try:
-                result = analysis_tool._run(
-                    conversation_file=var_file,
-                    output_file=insight_file
-                )
-                logger.info(f"Variation {var_num} analysis result: {result}")
-                if not result.startswith("SUCCESS"):
-                    logger.error(f"Variation {var_num} analysis failed: {result}. Halting.")
+            variation_insights[var_num] = insight_file
+            
+            if os.path.exists(insight_file):
+                logger.info(f"Skipping Analysis V{var_num}: {insight_file} already exists.")
+            else:
+                logger.info(f"Agent 3{'a' if var_num == 1 else 'b'}: analysing {var_file} → {insight_file}")
+                try:
+                    result = analysis_tool._run(conversation_file=var_file, output_file=insight_file)
+                    if not result.startswith("SUCCESS"):
+                        logger.error(f"Variation {var_num} analysis failed: {result}. Halting.")
+                        return
+                except Exception as exc:
+                    logger.error(f"Variation {var_num} analysis raised exception: {exc}", exc_info=True)
                     return
-                variation_insights[var_num] = insight_file
-            except Exception as exc:
-                logger.error(f"Variation {var_num} analysis raised exception: {exc}", exc_info=True)
-                return
 
-        logger.info("Both variation analyses completed. Proceeding to Reporting (Agent 4).")
-
-        # 4. Reporting (Agent 4a and 4b) — Must finish before Agents 5/6 start.
+        # 4. Reporting (Agent 4a and 4b)
         summary_files = {}
         execution_mode = self.agents.config.get_setting("agentExecutionMode", "sequential")
-        logger.info(f"Agent Reporting Execution Mode: {execution_mode}")
         
         def run_reporter(v_num, ins_file):
+            abs_summary = os.path.join(abs_data_dir, f"summary-variation{v_num}-{date_str}.json")
+            summary_files[v_num] = abs_summary
+            
+            if os.path.exists(abs_summary):
+                logger.info(f"Skipping Reporting V{v_num}: {abs_summary} already exists.")
+                return
+
             logger.info(f"Starting Reporter Agent 4{'a' if v_num == 1 else 'b'} for Variation {v_num}")
             agent = self.agents.reporter_agent(v_num)
-            # Relative path for CrewAI output to avoid path issues
             rel_summary = os.path.join(data_dir, f"summary-variation{v_num}-{date_str}.json")
             task = self.tasks.reporting_task(agent, ins_file, v_num, rel_summary)
-            crew = Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config)
-            crew.kickoff()
-            summary_files[v_num] = os.path.join(abs_data_dir, f"summary-variation{v_num}-{date_str}.json")
+            Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
             logger.info(f"Reporter Agent 4{'a' if v_num == 1 else 'b'} finished.")
 
         if execution_mode == "parallel":
@@ -156,32 +138,37 @@ class EmailInsightCrew:
             for t in report_threads:
                 t.join()
         else:
-            # Sequential (default)
             for v_num in [1, 2]:
                 run_reporter(v_num, variation_insights[v_num])
             
-        logger.info("All Reporting (Agent 4) completed. Starting Formatting and Visualization (Agents 5/6).")
+        logger.info("Reporting phase complete. Starting Formatting and Visualization.")
 
-        # 5. Formatting (Agent 5) and Visualization (Agent 6) — Parallel execution.
+        # 5. Formatting (Agent 5) and Visualization (Agent 6)
         final_threads = []
         
         def run_formatter(v_num, ins_file, sum_file):
+            abs_report = os.path.join(abs_data_dir, f"report-variation{v_num}-{date_str}.md")
+            if os.path.exists(abs_report):
+                logger.info(f"Skipping Formatter V{v_num}: {abs_report} already exists.")
+                return
+
             logger.info(f"Starting Formatter Agent 5{'a' if v_num == 1 else 'b'} for Variation {v_num}")
             agent = self.agents.formatter_agent(v_num)
             rel_report = os.path.join(data_dir, f"report-variation{v_num}-{date_str}.md")
-            abs_sum_file = os.path.join(abs_data_dir, os.path.basename(sum_file))
-            task = self.tasks.formatting_task(agent, ins_file, abs_sum_file, v_num, rel_report)
+            task = self.tasks.formatting_task(agent, ins_file, sum_file, v_num, rel_report)
             Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
-            logger.info(f"Formatter Agent 5{'a' if v_num == 1 else 'b'} finished.")
 
         def run_visualizer(v_num, ins_file, sum_file):
+            abs_mindmap = os.path.join(abs_data_dir, f"mindmap-variation{v_num}-{date_str}.html")
+            if os.path.exists(abs_mindmap):
+                logger.info(f"Skipping Visualizer V{v_num}: {abs_mindmap} already exists.")
+                return
+
             logger.info(f"Starting Visualizer Agent 6{'a' if v_num == 1 else 'b'} for Variation {v_num}")
             agent = self.agents.visualizer_agent(v_num)
             rel_mindmap = os.path.join(data_dir, f"mindmap-variation{v_num}-{date_str}.html")
-            abs_sum_file = os.path.join(abs_data_dir, os.path.basename(sum_file))
-            task = self.tasks.visualization_task(agent, ins_file, abs_sum_file, v_num, rel_mindmap)
+            task = self.tasks.visualization_task(agent, ins_file, sum_file, v_num, rel_mindmap)
             Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
-            logger.info(f"Visualizer Agent 6{'a' if v_num == 1 else 'b'} finished.")
 
         for v_num in [1, 2]:
             ins_file = variation_insights[v_num]
