@@ -149,7 +149,7 @@ class InsightTasks:
             output_file=output_file
         )
 
-    def visualization_task(self, agent, insight_file, summary_file, variation_num, output_file):
+    def visualization_task(self, agent, insight_file, summary_file, variation_num, output_file, visualization_logic="llm-local-large"):
         return Task(
             description=dedent(f"""\
                 Task: Generate a Self-Contained D3.js HTML Mindmap for Variation {variation_num}.

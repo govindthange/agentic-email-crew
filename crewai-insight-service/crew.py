@@ -165,38 +165,64 @@ class EmailInsightCrew:
             task = self.tasks.formatting_task(agent, ins_file, sum_file, v_num, rel_report)
             Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
 
-        def run_visualizer(v_num, ins_file, sum_file):
-            abs_mindmap = os.path.join(abs_data_dir, f"mindmap-variation{v_num}-{date_str}.html")
-            if os.path.exists(abs_mindmap):
-                logger.info(f"Skipping Visualizer V{v_num}: {abs_mindmap} already exists.")
-                return
-
-            logger.info(f"Starting Visualizer Agent 6{'a' if v_num == 1 else 'b'} for Variation {v_num}")
-            agent = self.agents.visualizer_agent(v_num)
-            rel_mindmap = os.path.join(data_dir, f"mindmap-variation{v_num}-{date_str}.html")
-            task = self.tasks.visualization_task(agent, ins_file, sum_file, v_num, rel_mindmap)
-            Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
-
+        # Run formatters
         if execution_mode == "parallel":
+            fmt_threads = []
             for v_num in [1, 2]:
                 ins_file = variation_insights[v_num]
                 sum_file = summary_files[v_num]
-                
-                logger.info(f"Starting Variation {v_num} (Formatter + Visualizer) in parallel.")
-                t5 = threading.Thread(target=run_formatter, args=(v_num, ins_file, sum_file))
-                t6 = threading.Thread(target=run_visualizer, args=(v_num, ins_file, sum_file))
-                
-                t5.start()
-                t6.start()
-                t5.join()
-                t6.join()
-                logger.info(f"Variation {v_num} Formatting/Visualization complete.")
+                t = threading.Thread(target=run_formatter, args=(v_num, ins_file, sum_file))
+                t.start()
+                fmt_threads.append(t)
+            for t in fmt_threads:
+                t.join()
         else:
-            # Sequential: 5a -> 6a -> 5b -> 6b
             for v_num in [1, 2]:
                 ins_file = variation_insights[v_num]
                 sum_file = summary_files[v_num]
                 run_formatter(v_num, ins_file, sum_file)
-                run_visualizer(v_num, ins_file, sum_file)
-            
+
+        visualization_logic = self.agents.config.get_setting("visualizationLogic", "code")
+
+        # ── Visualization ──────────────────────────────────────────
+        if visualization_logic == "code":
+            # generate_mindmap.py produces a single HTML containing both V1 & V2
+            # with an in-page toggle — only one file is needed.
+            mindmap_file = os.path.join(abs_data_dir, f"mindmap-{date_str}.html")
+            if os.path.exists(mindmap_file):
+                logger.info(f"Skipping Visualization (code): {mindmap_file} already exists.")
+            else:
+                logger.info("Generating mindmap directly via HTMLMindmapGeneratorTool (code mode).")
+                from custom_tools import HTMLMindmapGeneratorTool
+                tool = HTMLMindmapGeneratorTool()
+                # Use variation-1 insight file — the tool internally builds both V1 & V2 hierarchies
+                res = tool._run(insight_file=variation_insights[1], output_file=mindmap_file)
+                logger.info(res)
+        else:
+            # LLM-based: generate per-variation HTML via the visualizer agent
+            def run_visualizer(v_num, ins_file, sum_file):
+                abs_mindmap = os.path.join(abs_data_dir, f"mindmap-variation{v_num}-{date_str}.html")
+                if os.path.exists(abs_mindmap):
+                    logger.info(f"Skipping Visualizer V{v_num}: {abs_mindmap} already exists.")
+                    return
+                logger.info(f"Starting Visualizer Agent 6{'a' if v_num == 1 else 'b'} for Variation {v_num} with logic: {visualization_logic}")
+                agent = self.agents.visualizer_agent(v_num, visualization_logic)
+                rel_mindmap = os.path.join(data_dir, f"mindmap-variation{v_num}-{date_str}.html")
+                task = self.tasks.visualization_task(agent, ins_file, sum_file, v_num, rel_mindmap, visualization_logic)
+                Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
+
+            if execution_mode == "parallel":
+                for v_num in [1, 2]:
+                    ins_file = variation_insights[v_num]
+                    sum_file = summary_files[v_num]
+                    logger.info(f"Starting Variation {v_num} Visualizer in parallel (LLM mode).")
+                    t6 = threading.Thread(target=run_visualizer, args=(v_num, ins_file, sum_file))
+                    t6.start()
+                    t6.join()
+            else:
+                for v_num in [1, 2]:
+                    ins_file = variation_insights[v_num]
+                    sum_file = summary_files[v_num]
+                    run_visualizer(v_num, ins_file, sum_file)
+
         logger.info(f"Pipeline completed successfully for date {date_str}.")

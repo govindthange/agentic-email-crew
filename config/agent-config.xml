@@ -24,7 +24,24 @@
     <setting name="emailBodyLimit"     value="1000" />
     <setting name="toolOutputLimit"    value="50000" />
     <setting name="fileReadLimit"      value="120000" />
+    <!-- 
+      summaryLogic controls how executive summaries are generated:
+      - 'none': Leaves summary blank.
+      - 'code': Uses deterministic python string formatting (fastest, no LLM cost).
+      - 'llm-local-mini': Uses a lightweight local model (e.g., Mistral) for summary generation.
+      - 'llm-local-large': Uses a heavy local model (e.g., Llama 3.1 8B) for summary generation.
+      - 'llm-api-gemini': Uses Google Gemini API.
+      - 'llm-api-openai': Uses OpenAI API.
+    -->
     <setting name="summaryLogic"       value="llm-local-mini" />
+    
+    <!--
+      visualizationLogic controls how the mindmap is generated:
+      - 'code': Generates HTML directly via Python tool (fast, no LLM cost/hallucination).
+      - 'llm-local-mini': Uses a lightweight local model to write D3.js code.
+      - 'llm-local-large': Uses a heavy local model to write D3.js code.
+    -->
+    <setting name="visualizationLogic" value="code" />
     <!-- 
       agentExecutionMode: Decides if Agents 5 and 6 run sequentially or in staged parallel groups.
       - 'sequential': Runs Agent 5a -> 6a -> 5b -> 6b one at a time.

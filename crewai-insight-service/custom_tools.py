@@ -918,3 +918,60 @@ class ConversationAnalysisTool(BaseTool):
             pass
 
         return fallback
+
+class HTMLMindmapGeneratorTool(BaseTool):
+    name: str = "generate_html_mindmap_tool"
+    description: str = (
+        "Generates a premium D3.js HTML Mindmap (with both V1 and V2 views) "
+        "directly from the insight JSON and saves it. "
+        "Args: 'insight_file' (path to insight JSON), 'output_file' (path to save HTML)."
+    )
+
+    def _run(
+        self,
+        insight_file: Any = None,
+        summary_file: Any = None,
+        output_file: Optional[str] = None,
+        variation: Any = 1,
+        **kwargs,
+    ) -> str:
+        # ── resolve args (agent may pass them in kwargs or as a dict) ──
+        i_file = insight_file
+        if not i_file and kwargs:
+            i_file = kwargs.get("insight_file")
+        if isinstance(i_file, dict):
+            i_file = i_file.get("insight_file")
+
+        o_file = output_file
+        if not o_file and kwargs:
+            o_file = kwargs.get("output_file")
+
+        if not i_file or not os.path.exists(str(i_file)):
+            return f"Error: Insight file not found at {i_file}"
+        if not o_file:
+            return "Error: Output file path is required."
+
+        try:
+            # ── delegate to generate_mindmap.py ──────────────────────
+            from generate_mindmap import load_json, build_v1, build_v2, make_html, date_from_name
+
+            data = load_json(str(i_file))
+            date_str = date_from_name(str(i_file))
+            html_content = make_html(build_v1(data), build_v2(data), date_str)
+
+            # ── resolve output path ──────────────────────────────────
+            data_dir = os.getenv("DATA_DIR", "/app/data")
+            o_file_str = str(o_file)
+            if not os.path.isabs(o_file_str):
+                o_file_str = os.path.join(data_dir, os.path.basename(o_file_str))
+
+            with open(o_file_str, "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+            return f"SUCCESS: HTML Mindmap saved successfully to {o_file_str}"
+
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            return f"Error generating mindmap: {str(e)}\n{tb}"
+

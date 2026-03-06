@@ -25,11 +25,12 @@ class InsightAgents:
         self.light_llm = LLM(model=f"ollama/{self.light_model_name}", base_url=self.ollama_base_url, timeout=3600.0)
         self.heavy_llm = LLM(model=f"ollama/{self.heavy_model_name}", base_url=self.ollama_base_url, timeout=3600.0)
 
-        from custom_tools import EmailClusteringTool, EnhancedFileReadTool, HierarchicalGroupingTool, ConversationAnalysisTool
+        from custom_tools import EmailClusteringTool, EnhancedFileReadTool, HierarchicalGroupingTool, ConversationAnalysisTool, HTMLMindmapGeneratorTool
         self.file_tool = EnhancedFileReadTool()
         self.cluster_tool = EmailClusteringTool()
         self.group_tool = HierarchicalGroupingTool()
         self.analysis_tool = ConversationAnalysisTool()
+        self.html_mindmap_tool = HTMLMindmapGeneratorTool()
 
     def preprocessor_agent(self):
         return Agent(
@@ -92,12 +93,13 @@ class InsightAgents:
             tools=[self.file_tool]
         )
 
-    def visualizer_agent(self, variation):
+    def visualizer_agent(self, variation, visualization_logic="llm-local-large"):
+        llm = self.light_llm if "mini" in visualization_logic else self.heavy_llm
         return Agent(
             role=f'Interactive Mindmap Visualizer (Variation {variation})',
             goal='Create a self-contained D3.js HTML mindmap based on insight JSON. Use tool to read data.',
             backstory="""You specialize in interactive HTML visualizations that need no external dependencies (other than D3.js).""",
-            llm=self.heavy_llm,
+            llm=llm,
             verbose=True,
             allow_delegation=False,
             tools=[self.file_tool]
