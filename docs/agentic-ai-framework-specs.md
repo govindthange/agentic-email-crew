@@ -71,13 +71,13 @@ conv-variation1   conv-variation2
      ▼              ▼       ▼                ▼              ▼       ▼
 ┌─────────┐    ┌──────────────┐         ┌─────────┐    ┌──────────────┐
 │Agent 5a │    │   Agent 6a   │         │Agent 5b │    │   Agent 6b   │
-│Formatter│    │  Visualize   │         │Formatter│    │  Visualize   │
+│Visualize│    │  Formatter   │         │Visualize│    │  Formatter   │
 │Variation│    │  Variation 1 │         │Variation│    │  Variation 2 │
 │   1     │    └──────────────┘         │   2     │    └──────────────┘
 └────┬────┘           │                 └────┬────┘           │
      ▼                ▼                      ▼                ▼
-report-v1.md     mindmap-v1.html        report-v2.md     mindmap-v2.html
-(Human Report)   (Interactive)          (Human Report)   (Interactive)
+mindmap-v1.html  report-v1.md        mindmap-v2.html     report-v2.md
+ (Interactive)   (Human report)       (Interactive)     (Human report)
 ```
 
 **Process Mode:** Sequential between Agent 1 → 2 → (3a ∥ 3b) → (4a ∥ 4b) → [(5a ∥ 5a) ∥ (6a ∥ 6b)]
@@ -426,9 +426,9 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 ---
 
-### Agent 4a — Executive Reporter (Variation 1)
+### Agent 4a — Executive Summary Agent (Variation 1)
 
-### Agent 4b — Executive Reporter (Variation 2)
+### Agent 4b — Executive Summary Agent (Variation 2)
 
 > **Agents 4a and 4b are identical in logic.** They run in parallel: 4a processes `insight-variation1-YYYYMMDD.json` and 4b processes `insight-variation2-YYYYMMDD.json`.
 
@@ -496,11 +496,78 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 ---
 
-### Agent 5a — Report Formatter (Variation 1)
+### Agent 5a — Visualizer Agent (Variation 1)
 
-### Agent 5b — Report Formatter (Variation 2)
+### Agent 5b — Visualizer Agent (Variation 2)
 
-> **Agents 5a and 5b are identical in logic.** They run in parallel: 5a uses `insight-variation1-YYYYMMDD.json` and `summary-variation1-YYYYMMDD.json`; 5b uses the Variation 2 equivalents. These agents produce the **only human-readable formatted report files** in the pipeline (Markdown, consumed directly by humans as structured data).
+> **Agents 5a and 5b are identical in logic.** They run in parallel on their respective  formatted report JSON and summary JSON files.
+
+**Role:** Interactive HTML Tree Visualizer
+
+**Model:** Light model (e.g., `mistral-nemo` via Ollama) for content formatting; no LLM reasoning required — this is a structural rendering task.
+
+**Backstory:** You specialize in translating hierarchical data into self-contained, interactive HTML visualizations that need no external dependencies. You know that Mermaid.js `mindmap` diagrams do not support hover tooltips natively, so you build lightweight HTML pages using inline JavaScript (vanilla D3.js or a collapsible tree library) that render the hierarchy with click-to-expand nodes and tooltip overlays showing topic details.
+
+**Goal:** Produce a self-contained single-file HTML mindmap visualization for each variation. The root node is `"Daily Summary — YYYY-MM-DD"`. Nodes are color-coded by priority. Clicking or hovering a topic node reveals a tooltip with the full insight summary.
+
+**Technical Approach:** Use an inline `<script>` block embedding D3.js (loaded from CDN) to render a collapsible radial tree or force-directed graph. Do not use Mermaid.js `mindmap` syntax for the interactive version — it does not support hover/click behaviors.
+
+**Optionally**, also generate a static Mermaid.js block (non-interactive, for embedding in docs) and include it in a `<details>` / `<summary>` collapsible section at the bottom of the HTML file.
+
+**Tasks:**
+
+1. Read the insight file and summary file created by earlier agents (3a, 3b, 4a, 4b). Essentially, Agent 5a reads `./data/insight-variation1-YYYYMMDD.json` created by agent 3a and `./data/summary-variation1-YYYYMMDD.json` created by agent 4a. Similarly, Agent 5b reads `./data/insight-variation2-YYYYMMDD.json` created by agent 3b and `./data/summary-variation2-YYYYMMDD.json` created by agent 4b.
+
+2. Build the node tree:
+   - **Root:** `"Daily Summary — YYYY-MM-DD"`
+   - **Level 1:** Clients (Variation 1) or Projects (Variation 2)
+   - **Level 2:** Projects under each Client (V1) or Clients under each Project (V2)
+   - **Level 3:** Topics (leaf nodes)
+
+3. Node color coding per topic:
+   - 🔴 `#e74c3c` — `priorityScore` 5
+   - 🟠 `#e67e22` — `priorityScore` 4
+   - 🟡 `#f1c40f` — `priorityScore` 3
+   - 🟢 `#27ae60` — `priorityScore` 1–2
+
+4. Tooltip content on hover/click for each topic node:
+
+```
+[Topic Title]
+─────────────────────
+State:    Awaiting Response
+Summary:  The client AB is experiencing...
+Next:     Raj to share DB config diff by EOD Thu
+Owner:    Raj Mehta
+Priority: 5/5  |  ⚠ Escalation  |  🚧 Blocker
+```
+
+5. Level 1 and Level 2 nodes show aggregate stats in their tooltip:
+   - Number of topics
+   - Number of escalations
+   - Highest priority score in this branch
+
+6. Include a **legend** in the bottom-right corner of the visualization.
+
+7. Include a **filter control panel** in the top-right corner with checkboxes:
+   - Show Priority 5 (default: checked)
+   - Show Priority 4 (default: checked)
+   - Show Priority 3 (default: checked)
+   - Show Priority 1–2 (default: unchecked — hidden by default to reduce noise)
+
+8. The HTML file must be fully self-contained (no external file dependencies other than D3.js loaded via CDN). It must render correctly when opened directly in a browser without a local server.
+
+9. Output:
+   - Agent 6a → `./data/mindmap-variation1-YYYYMMDD.html`
+   - Agent 6b → `./data/mindmap-variation2-YYYYMMDD.html`
+
+---
+
+### Agent 6a — Report Formatter Agent (Variation 1)
+
+### Agent 6b — Report Formatter Agent (Variation 2)
+
+> **Agents 6a and 6b are identical in logic.** They run in parallel: 6a uses `insight-variation1-YYYYMMDD.json` and `summary-variation1-YYYYMMDD.json`; 6b uses the Variation 2 equivalents. These agents produce the **only human-readable formatted report files** in the pipeline (Markdown, consumed directly by humans as structured data).
 
 **Role:** Executive Report Markdown Formatter.
 
@@ -512,7 +579,7 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 **Tasks:**
 
-1. Read the insight file and summary file created by earlier agents. Essentially, Agent 5a reads `./data/insight-variation1-YYYYMMDD.json` created by agent 3a and `./data/summary-variation1-YYYYMMDD.json` created by agent 4a. Similarly, Agent 5b reads `./data/insight-variation2-YYYYMMDD.json` created by agent 3b and `./data/summary-variation2-YYYYMMDD.json` created by agent 4b.
+1. Read the insight file and summary file created by earlier agents. Essentially, Agent 6a reads `./data/insight-variation1-YYYYMMDD.json` created by agent 3a and `./data/summary-variation1-YYYYMMDD.json` created by agent 4a. Similarly, Agent 6b reads `./data/insight-variation2-YYYYMMDD.json` created by agent 3b and `./data/summary-variation2-YYYYMMDD.json` created by agent 4b.
 
 2. Render the formatted report JSON as follows. Use this exact structure:
 
@@ -585,75 +652,8 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 ```
 
 7. Output:
-   - Agent 5a → `./data/report-variation1-YYYYMMDD.md`
-   - Agent 5b → `./data/report-variation2-YYYYMMDD.md`
-
----
-
-### Agent 6a — Mindmap Visualizer (Variation 1)
-
-### Agent 6b — Mindmap Visualizer (Variation 2)
-
-> **Agents 6a and 6b are identical in logic.** They run in parallel on their respective  formatted report JSON and summary JSON files.
-
-**Role:** Interactive Mindmap HTML Visualizer
-
-**Model:** Light model (e.g., `mistral-nemo` via Ollama) for content formatting; no LLM reasoning required — this is a structural rendering task.
-
-**Backstory:** You specialize in translating hierarchical data into self-contained, interactive HTML visualizations that need no external dependencies. You know that Mermaid.js `mindmap` diagrams do not support hover tooltips natively, so you build lightweight HTML pages using inline JavaScript (vanilla D3.js or a collapsible tree library) that render the hierarchy with click-to-expand nodes and tooltip overlays showing topic details.
-
-**Goal:** Produce a self-contained single-file HTML mindmap visualization for each variation. The root node is `"Daily Summary — YYYY-MM-DD"`. Nodes are color-coded by priority. Clicking or hovering a topic node reveals a tooltip with the full insight summary.
-
-**Technical Approach:** Use an inline `<script>` block embedding D3.js (loaded from CDN) to render a collapsible radial tree or force-directed graph. Do not use Mermaid.js `mindmap` syntax for the interactive version — it does not support hover/click behaviors.
-
-**Optionally**, also generate a static Mermaid.js block (non-interactive, for embedding in docs) and include it in a `<details>` / `<summary>` collapsible section at the bottom of the HTML file.
-
-**Tasks:**
-
-1. Read the insight file and summary file created by earlier agents (3a, 3b, 4a, 4b). Essentially, Agent 6a reads `./data/insight-variation1-YYYYMMDD.json` created by agent 3a and `./data/summary-variation1-YYYYMMDD.json` created by agent 4a. Similarly, Agent 6b reads `./data/insight-variation2-YYYYMMDD.json` created by agent 3b and `./data/summary-variation2-YYYYMMDD.json` created by agent 4b.
-
-2. Build the node tree:
-   - **Root:** `"Daily Summary — YYYY-MM-DD"`
-   - **Level 1:** Clients (Variation 1) or Projects (Variation 2)
-   - **Level 2:** Projects under each Client (V1) or Clients under each Project (V2)
-   - **Level 3:** Topics (leaf nodes)
-
-3. Node color coding per topic:
-   - 🔴 `#e74c3c` — `priorityScore` 5
-   - 🟠 `#e67e22` — `priorityScore` 4
-   - 🟡 `#f1c40f` — `priorityScore` 3
-   - 🟢 `#27ae60` — `priorityScore` 1–2
-
-4. Tooltip content on hover/click for each topic node:
-
-```
-[Topic Title]
-─────────────────────
-State:    Awaiting Response
-Summary:  The client AB is experiencing...
-Next:     Raj to share DB config diff by EOD Thu
-Owner:    Raj Mehta
-Priority: 5/5  |  ⚠ Escalation  |  🚧 Blocker
-```
-
-5. Level 1 and Level 2 nodes show aggregate stats in their tooltip:
-   - Number of topics
-   - Number of escalations
-   - Highest priority score in this branch
-
-6. Include a **legend** in the bottom-right corner of the visualization.
-
-7. Include a **filter control panel** in the top-right corner with checkboxes:
-   - Show Priority 5 (default: checked)
-   - Show Priority 4 (default: checked)
-   - Show Priority 3 (default: checked)
-   - Show Priority 1–2 (default: unchecked — hidden by default to reduce noise)
-
-8. The HTML file must be fully self-contained (no external file dependencies other than D3.js loaded via CDN). It must render correctly when opened directly in a browser without a local server.
-
-9. Output:
-   - Agent 6a → `./data/mindmap-variation1-YYYYMMDD.html`
-   - Agent 6b → `./data/mindmap-variation2-YYYYMMDD.html`
+   - Agent 6a → `./data/report-variation1-YYYYMMDD.md`
+   - Agent 6b → `./data/report-variation2-YYYYMMDD.md`
 
 ---
 

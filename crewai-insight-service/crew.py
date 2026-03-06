@@ -150,41 +150,11 @@ class EmailInsightCrew:
             for v_num in [1, 2]:
                 run_reporter(v_num, variation_insights[v_num])
             
-        logger.info("Reporting phase complete. Starting Formatting and Visualization.")
+        logger.info("Reporting phase complete. Starting Visualization.")
 
-        # 5. Formatting (Agent 5) and Visualization (Agent 6)
-        def run_formatter(v_num, ins_file, sum_file):
-            abs_report = os.path.join(abs_data_dir, f"report-variation{v_num}-{date_str}.md")
-            if os.path.exists(abs_report):
-                logger.info(f"Skipping Formatter V{v_num}: {abs_report} already exists.")
-                return
-
-            logger.info(f"Starting Formatter Agent 5{'a' if v_num == 1 else 'b'} for Variation {v_num}")
-            agent = self.agents.formatter_agent(v_num)
-            rel_report = os.path.join(data_dir, f"report-variation{v_num}-{date_str}.md")
-            task = self.tasks.formatting_task(agent, ins_file, sum_file, v_num, rel_report)
-            Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
-
-        # Run formatters
-        if execution_mode == "parallel":
-            fmt_threads = []
-            for v_num in [1, 2]:
-                ins_file = variation_insights[v_num]
-                sum_file = summary_files[v_num]
-                t = threading.Thread(target=run_formatter, args=(v_num, ins_file, sum_file))
-                t.start()
-                fmt_threads.append(t)
-            for t in fmt_threads:
-                t.join()
-        else:
-            for v_num in [1, 2]:
-                ins_file = variation_insights[v_num]
-                sum_file = summary_files[v_num]
-                run_formatter(v_num, ins_file, sum_file)
-
+        # 5. Visualization (Agent 6) — runs right after summaries are ready
         visualization_logic = self.agents.config.get_setting("visualizationLogic", "code")
 
-        # ── Visualization ──────────────────────────────────────────
         if visualization_logic == "code":
             # generate_mindmap.py produces a single HTML containing both V1 & V2
             # with an in-page toggle — only one file is needed.
@@ -224,5 +194,36 @@ class EmailInsightCrew:
                     ins_file = variation_insights[v_num]
                     sum_file = summary_files[v_num]
                     run_visualizer(v_num, ins_file, sum_file)
+
+        logger.info("Visualization phase complete. Starting Formatting.")
+
+        # 6. Formatting (Agent 5) — runs last
+        def run_formatter(v_num, ins_file, sum_file):
+            abs_report = os.path.join(abs_data_dir, f"report-variation{v_num}-{date_str}.md")
+            if os.path.exists(abs_report):
+                logger.info(f"Skipping Formatter V{v_num}: {abs_report} already exists.")
+                return
+
+            logger.info(f"Starting Formatter Agent 5{'a' if v_num == 1 else 'b'} for Variation {v_num}")
+            agent = self.agents.formatter_agent(v_num)
+            rel_report = os.path.join(data_dir, f"report-variation{v_num}-{date_str}.md")
+            task = self.tasks.formatting_task(agent, ins_file, sum_file, v_num, rel_report)
+            Crew(agents=[agent], tasks=[task], verbose=True, embedder=self.embedder_config).kickoff()
+
+        if execution_mode == "parallel":
+            fmt_threads = []
+            for v_num in [1, 2]:
+                ins_file = variation_insights[v_num]
+                sum_file = summary_files[v_num]
+                t = threading.Thread(target=run_formatter, args=(v_num, ins_file, sum_file))
+                t.start()
+                fmt_threads.append(t)
+            for t in fmt_threads:
+                t.join()
+        else:
+            for v_num in [1, 2]:
+                ins_file = variation_insights[v_num]
+                sum_file = summary_files[v_num]
+                run_formatter(v_num, ins_file, sum_file)
 
         logger.info(f"Pipeline completed successfully for date {date_str}.")
