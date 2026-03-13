@@ -58,26 +58,25 @@ conv-variation1   conv-variation2
 │   1     │                             │   2     │
 └────┬────┘                             └────┬────┘
      │ insight-v1-YYYYMMDD.json              │ insight-v2-YYYYMMDD.json
-     ├──────────────────────┐                ├──────────────────────┐
-     ▼                      │                ▼                      │
-┌─────────┐                 │           ┌─────────┐                 │
-│Agent 4a │                 │           │Agent 4b │                 │
-│Reporter │                 │           │Reporter │                 │
-│Variation│                 │           │Variation│                 │
-│   1     │                 │           │   2     │                 │
-└────┬────┘                 │           └────┬────┘                 │
-     │ summary-v1.json      │                │ summary-v2.json      │
-     ├──────────────┐       │                ├──────────────┐       │
-     ▼              ▼       ▼                ▼              ▼       ▼
-┌─────────┐    ┌──────────────┐         ┌─────────┐    ┌──────────────┐
-│Agent 5a │    │   Agent 6a   │         │Agent 5b │    │   Agent 6b   │
-│Visualize│    │  Formatter   │         │Visualize│    │  Formatter   │
-│Variation│    │  Variation 1 │         │Variation│    │  Variation 2 │
-│   1     │    └──────────────┘         │   2     │    └──────────────┘
-└────┬────┘           │                 └────┬────┘           │
-     ▼                ▼                      ▼                ▼
-mindmap-v1.html  report-v1.md        mindmap-v2.html     report-v2.md
- (Interactive)   (Human report)       (Interactive)     (Human report)
+     ├──────────────────────┐                ├─────────────────────────┐
+     ▼                      │                ▼                         │
+┌────────────┐              │           ┌────────────┐                 │
+│Agent 4a    │              │           │Agent 4b    │                 │
+│Reporter    │              │           │Reporter    │                 │
+│Variation 1 │              │           │Variation 2 │                 │
+└────┬───────┘              │           └────┬───────┘                 │
+     │ summary-v1.json      │                │ summary-v2.json         │
+     ├────────────────┐     │                ├────────────────────┐    │
+     ▼                ▼     ▼                ▼                    ▼    ▼
+┌─────────────┐    ┌──────────────┐         ┌─────────────┐    ┌──────────────┐
+│  Agent 5a   │    │   Agent 6a   │         │  Agent 5b   │    │   Agent 6b   │
+│ Visualizer  │    │  Formatter   │         │ Visualizer  │    │  Formatter   │
+│ Variation 1 │    │  Variation 1 │         │ Variation 2 │    │  Variation 2 │
+└────┬────────┘    └──────┬───────┘         └────┬────────┘    └──────┬───────┘
+     │                    │                      │                    │
+     ▼                    ▼                      ▼                    ▼
+mindmap-v1.html      report-v1.md         mindmap-v2.html        report-v2.md
+ (Interactive)       (Human report)         (Interactive)        (Human report)
 ```
 
 **Process Mode:** Sequential between Agent 1 → 2 → (3a ∥ 3b) → (4a ∥ 4b) → [(5a ∥ 5a) ∥ (6a ∥ 6b)]
@@ -146,12 +145,12 @@ Each element in the root array is an email object with at minimum the following 
 | `conversation-variation2-YYYYMMDD.json` | Agent 2 | Agent 3b |
 | `insight-variation1-YYYYMMDD.json` | Agent 3a | Agent 4a, Agent 5a, Agent 6a |
 | `insight-variation2-YYYYMMDD.json` | Agent 3b | Agent 4b, Agent 5b, Agent 6b |
-| `summary-variation1-YYYYMMDD.json` | Agent 4a | Agent 5a |
-| `summary-variation2-YYYYMMDD.json` | Agent 4b | Agent 5b |
-| `report-variation1-YYYYMMDD.md` | Agent 5a | Human Reader |
-| `report-variation2-YYYYMMDD.md` | Agent 5b | Human Reader |
-| `mindmap-variation1-YYYYMMDD.html` | Agent 6a | Human Reader / Dashboard |
-| `mindmap-variation2-YYYYMMDD.html` | Agent 6b | Human Reader / Dashboard |
+| `summary-variation1-YYYYMMDD.json` | Agent 4a | Agent 5a, Agent 6a |
+| `summary-variation2-YYYYMMDD.json` | Agent 4b | Agent 5b, Agent 6b |
+| `mindmap-variation1-YYYYMMDD.html` | Agent 5a | Human Reader / Dashboard |
+| `mindmap-variation2-YYYYMMDD.html` | Agent 5b | Human Reader / Dashboard |
+| `report-variation1-YYYYMMDD.md` | Agent 6a | Human Reader |
+| `report-variation2-YYYYMMDD.md` | Agent 6b | Human Reader |
 
 > **Convention:** All intermediate and formatted report files use `.json`. Only the interactive mindmap visualizations use `.html`.
 
@@ -161,9 +160,9 @@ Each element in the root array is an email object with at minimum the following 
 
 ---
 
-### Agent 1 — Email Preprocessor & Semantic Deduplicator
+### Agent 1 — Preprocessor
 
-**Role:** Email Preprocessor & Semantic Deduplication Engine
+**Role:** Email Preprocessor & Semantic Deduplicator Agent
 
 **Model:** Light model (e.g., `mistral-nemo` via Ollama) combined with a local embedding model (e.g., `nomic-embed-text`) for vector similarity clustering.
 
@@ -238,9 +237,9 @@ Emails that are pure calendar invites with no substantive body, automated system
 
 ---
 
-### Agent 2 — Hierarchical Grouper
+### Agent 2 — Grouper
 
-**Role:** Conversation Thread Hierarchical Organizer
+**Role:** Conversation Thread Grouper
 
 **Model:** Light model (e.g., `mistral-nemo` via Ollama)
 
@@ -327,9 +326,9 @@ Read the flat cluster list from Agent 1 and produce two hierarchically organized
 
 ---
 
-### Agent 3a — Conversation Analyst (Variation 1)
+### Agent 3a — Analyst (Variation 1)
 
-### Agent 3b — Conversation Analyst (Variation 2)
+### Agent 3b — Analyst (Variation 2)
 
 > **Agents 3a and 3b are identical in logic.** They run in parallel: 3a processes `conversation-variation1-YYYYMMDD.json` and 3b processes `conversation-variation2-YYYYMMDD.json`. The instructions below apply to both.
 
@@ -426,9 +425,9 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 ---
 
-### Agent 4a — Executive Summary Agent (Variation 1)
+### Agent 4a — Reporter (Variation 1)
 
-### Agent 4b — Executive Summary Agent (Variation 2)
+### Agent 4b — Reporter (Variation 2)
 
 > **Agents 4a and 4b are identical in logic.** They run in parallel: 4a processes `insight-variation1-YYYYMMDD.json` and 4b processes `insight-variation2-YYYYMMDD.json`.
 
@@ -496,9 +495,9 @@ Assign each topic a `priorityScore` from 1–5 using these rules:
 
 ---
 
-### Agent 5a — Visualizer Agent (Variation 1)
+### Agent 5a — Visualizer (Variation 1)
 
-### Agent 5b — Visualizer Agent (Variation 2)
+### Agent 5b — Visualizer (Variation 2)
 
 > **Agents 5a and 5b are identical in logic.** They run in parallel on their respective  formatted report JSON and summary JSON files.
 
@@ -563,9 +562,9 @@ Priority: 5/5  |  ⚠ Escalation  |  🚧 Blocker
 
 ---
 
-### Agent 6a — Report Formatter Agent (Variation 1)
+### Agent 6a — Report Formatter (Variation 1)
 
-### Agent 6b — Report Formatter Agent (Variation 2)
+### Agent 6b — Report Formatter (Variation 2)
 
 > **Agents 6a and 6b are identical in logic.** They run in parallel: 6a uses `insight-variation1-YYYYMMDD.json` and `summary-variation1-YYYYMMDD.json`; 6b uses the Variation 2 equivalents. These agents produce the **only human-readable formatted report files** in the pipeline (Markdown, consumed directly by humans as structured data).
 

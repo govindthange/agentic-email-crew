@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="pfjNa4OO-TDFX9SIK5Uh" name="AI Agentic Architecture">
-        <mxGraphModel dx="1042" dy="558" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+        <mxGraphModel dx="766" dy="721" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -91,7 +91,7 @@
                 <mxCell id="60" value="" style="group" parent="8" vertex="1" connectable="0">
                     <mxGeometry x="547" y="380" width="40" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="20" value="Agent 6b&#10;Visualizer" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;shape=mxgraph.mscae.enterprise.bot;fillColor=#f8cecc;strokeColor=#b85450;" parent="60" vertex="1">
+                <mxCell id="20" value="Agent 6b&lt;br&gt;Formatter" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;shape=mxgraph.mscae.enterprise.bot;fillColor=#f8cecc;strokeColor=#b85450;" parent="60" vertex="1">
                     <mxGeometry width="40" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="53" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/icon-cache1/Social_media_and_logos-2598/Logo_reddit_robot-1024.svg" parent="60" vertex="1">
@@ -115,7 +115,7 @@
                 <mxCell id="83" value="" style="group" parent="8" vertex="1" connectable="0">
                     <mxGeometry x="547" y="169" width="40" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="84" value="Agent 6a&lt;br&gt;Visualizer" style="verticalLabelPosition=top;html=1;verticalAlign=bottom;align=center;shape=mxgraph.mscae.enterprise.bot;fillColor=#f8cecc;strokeColor=#b85450;labelPosition=center;" parent="83" vertex="1">
+                <mxCell id="84" value="Agent 6a&lt;br&gt;Formatter" style="verticalLabelPosition=top;html=1;verticalAlign=bottom;align=center;shape=mxgraph.mscae.enterprise.bot;fillColor=#f8cecc;strokeColor=#b85450;labelPosition=center;" parent="83" vertex="1">
                     <mxGeometry width="40" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="85" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/icon-cache1/Social_media_and_logos-2598/Logo_reddit_robot-1024.svg" parent="83" vertex="1">
@@ -127,7 +127,7 @@
                 <mxCell id="62" value="" style="group;fillColor=none;strokeColor=#b85450;container=0;" parent="91" vertex="1" connectable="0">
                     <mxGeometry width="40" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="14" value="Agent 5a&#10;Formatter" style="verticalLabelPosition=top;html=1;verticalAlign=bottom;align=center;shape=mxgraph.mscae.enterprise.bot;fillColor=#fff2cc;strokeColor=#d6b656;container=0;labelPosition=center;" parent="91" vertex="1">
+                <mxCell id="14" value="Agent 5a&lt;br&gt;Visualizer" style="verticalLabelPosition=top;html=1;verticalAlign=bottom;align=center;shape=mxgraph.mscae.enterprise.bot;fillColor=#fff2cc;strokeColor=#d6b656;container=0;labelPosition=center;" parent="91" vertex="1">
                     <mxGeometry width="40" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="46" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/icon-cache1/Social_media_and_logos-2606/Logo_reddit_robot-1226.svg" parent="91" vertex="1">
@@ -139,7 +139,7 @@
                 <mxCell id="80" value="" style="group;fillColor=none;strokeColor=#b85450;container=0;" parent="92" vertex="1" connectable="0">
                     <mxGeometry width="40" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="81" value="Agent 5b&lt;br&gt;Formatter" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;shape=mxgraph.mscae.enterprise.bot;fillColor=#fff2cc;strokeColor=#d6b656;container=0;" parent="92" vertex="1">
+                <mxCell id="81" value="Agent 5b&lt;br&gt;Visualizer" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;shape=mxgraph.mscae.enterprise.bot;fillColor=#fff2cc;strokeColor=#d6b656;container=0;" parent="92" vertex="1">
                     <mxGeometry width="40" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="90" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/icon-cache1/Social_media_and_logos-2606/Logo_reddit_robot-1226.svg" parent="92" vertex="1">
@@ -148,7 +148,7 @@
                 <mxCell id="95" value="" style="group" parent="8" vertex="1" connectable="0">
                     <mxGeometry x="249" y="212" width="50" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="9" value="Agent 1&#10;Deduplicator" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;shape=mxgraph.mscae.enterprise.bot_group;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="95" vertex="1">
+                <mxCell id="9" value="Agent 1&lt;br&gt;Preoprocessor" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;shape=mxgraph.mscae.enterprise.bot_group;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="95" vertex="1">
                     <mxGeometry width="50" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="94" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/icon-cache1/Unicons_Line_vol_5-2967/robot-789.svg;container=0;" parent="95" vertex="1">

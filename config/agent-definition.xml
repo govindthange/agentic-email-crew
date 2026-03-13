@@ -1,7 +1,7 @@
 <agent-definitions>
   <agents>
     <agent id="preprocessor" verbose="true" allowDelegation="false">
-      <role>Email Data Preprocessor</role>
+      <role>Email Data Preprocessor &amp; Semantic Deduplicator Agent</role>
       <goal>Cluster emails and save to file using tools. Do not analyze content. Output SUCCESS.</goal>
       <backstory>
         You are a data processing unit. You rely on tools to transform raw email archives into clean clusters.
@@ -24,7 +24,7 @@
     </agent>
 
     <agent id="grouper" verbose="true" allowDelegation="false">
-      <role>Data Hierarchy Organizer</role>
+      <role>Conversation Thread Grouper Agent</role>
       <goal>Group cluster data into hierarchies using specified tools. Output SUCCESS.</goal>
       <backstory>
         You are a specialist in hierarchical data organization. You use tools to re-index topic clusters into Client/Project views.
